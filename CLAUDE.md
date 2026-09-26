@@ -20,8 +20,8 @@ The scaffold is planned in step 1 of `docs/implementation.md`. Keep this list in
 | Command | Purpose |
 | --- | --- |
 | `pnpm install` | Install dependencies |
-| `pnpm kb <cmd>` | Run the CLI: `embed`, `check`, `search`, `serve`, `eval` |
-| `pnpm start` | `kb serve` (HTTP API) with the configured KB |
+| `pnpm mdrag <cmd>` | Run the CLI: `embed`, `check`, `search`, `serve`, `eval` |
+| `pnpm start` | `mdrag serve` (HTTP API) with the configured KB |
 | `pnpm lint` / `pnpm lint:fix` | Biome check / apply fixes and formatting |
 | `pnpm typecheck` | `tsc --noEmit` |
 | `pnpm test` | Unit tests; no model downloads and no LLM calls |
@@ -53,13 +53,13 @@ Before reporting work as done, run `pnpm lint:fix`, `pnpm typecheck` and `pnpm t
 | CLI entry and subcommands | `src/cli/` |
 | Runtime config | `src/config/` |
 | KB loading and contract validation | `src/contract/` |
-| Sidecar format, freshness, `kb embed` | `src/sidecars/` |
+| Sidecar format, freshness, `mdrag embed` | `src/sidecars/` |
 | Chunkers (structure-aware splitter, LLM) | `src/chunking/` |
 | Embedder and reranker | `src/models/` |
 | Orama index and candidate search | `src/index/` |
 | Retrieval pipeline (rerank, recency, cutoff) | `src/retrieval/` |
 | Library API (`createEngine`, schemas) | `src/engine/` |
-| HTTP handler and `kb serve` | `src/http/` |
+| HTTP handler and `mdrag serve` | `src/http/` |
 | Eval and benchmarks | `src/eval/` |
 | Orama docs | https://docs.orama.com |
 | transformers.js docs | https://huggingface.co/docs/transformers.js |

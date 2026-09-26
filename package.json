@@ -1,0 +1,26 @@
+{
+  "name": "md-rag",
+  "version": "0.1.0",
+  "description": "Serves a Git repository of Markdown files to AI agents via in-process hybrid search.",
+  "license": "MIT",
+  "type": "module",
+  "private": true,
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "mdrag": "node src/cli/main.ts",
+    "start": "node src/cli/main.ts serve",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:models": "vitest run --config vitest.models.config.ts"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.5.14",
+    "@types/node": "^26.6.3",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.2"
+  }
+}

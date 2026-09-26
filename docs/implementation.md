@@ -6,12 +6,12 @@ Status: `planned` · `in-progress` · `done`
 
 ## Milestone 1: Foundation
 
-### 1. Project scaffold · `planned`
+### 1. Project scaffold · `done`
 
 - pnpm project, Node 24 (`engines`, `.nvmrc`), `"type": "module"`, MIT `LICENSE` (ADR-020, ADR-021).
 - `tsconfig.json` set up for type stripping: `noEmit`, `erasableSyntaxOnly`, `allowImportingTsExtensions`, `verbatimModuleSyntax`, `strict`.
 - Biome, Vitest, and the scripts listed in `CLAUDE.md`. Model-backed tests (`*.models.test.ts`) are excluded from `pnpm test`.
-- A `kb` bin backed by `src/cli/main.ts`, which dispatches subcommands with `node:util` `parseArgs`. At this stage `kb --help` is the only command.
+- A `mdrag` script (`pnpm mdrag <cmd>`) backed by `src/cli/main.ts`, which dispatches subcommands with `node:util` `parseArgs`. At this stage `pnpm mdrag --help` is the only command.
 - **Done when:** `pnpm lint`, `pnpm typecheck` and `pnpm test` pass on a smoke test.
 
 ### 2. Project CI · `planned`
@@ -30,7 +30,7 @@ Status: `planned` · `in-progress` · `done`
 
 ### 4. Config module · `planned`
 
-- A single `loadConfig()` combines defaults, an optional `kb.config.json` in the KB root, `KB_*` environment variables and CLI flags, in increasing order of precedence, validated with zod.
+- A single `loadConfig()` combines defaults, an optional `mdrag.config.json` in the KB root, `KB_*` environment variables and CLI flags, in increasing order of precedence, validated with zod.
 - It starts with the KB directory only. Every later step adds the fields it needs. No placeholder fields.
 
 ## Milestone 2: Content model
@@ -44,7 +44,7 @@ Status: `planned` · `in-progress` · `done`
 - Returns documents containing `path` (POSIX, relative to the root), `docHash`, the parsed tree, the body, and typed metadata (`updated_at` as epoch milliseconds).
 - **Tests:** valid and invalid fixtures; CRLF and LF versions of a file give the same hash.
 
-### 6. `kb check` (contract only) · `planned`
+### 6. `mdrag check` (contract only) · `planned`
 
 - A CLI command that runs the loader and exits non-zero with the aggregated errors. Sidecar freshness is added in step 12.
 
@@ -81,7 +81,7 @@ Status: `planned` · `in-progress` · `done`
 - Config covers the model cache directory and whether remote models are allowed (ADR-022). The model loads lazily, once. The BGE query instruction prefix is applied only to queries.
 - **Tests:** a `*.models.test.ts` checks that a paraphrase pair outscores an unrelated pair, and that vectors have 384 dimensions and are L2-normalised.
 
-### 11. `kb embed` · `planned`
+### 11. `mdrag embed` · `planned`
 
 - For each document whose `doc_hash` differs from its sidecar (or that has no sidecar, or with `--rechunk`):
   - chunk it with the configured chunker
@@ -93,9 +93,9 @@ Status: `planned` · `in-progress` · `done`
 - **Tests:** use a counting fake embedder and a fake chunker. Editing one document processes only that document and re-embeds only its changed chunks. Deleting a document prunes its sidecar. Changing the model re-embeds without re-chunking. When the embedder fails on one document, only that document is reported and every other sidecar is still written.
 - Commit the sidecars generated for `examples/kb` with the splitter.
 
-### 12. Sidecar freshness in `kb check` · `planned`
+### 12. Sidecar freshness in `mdrag check` · `planned`
 
-- A shared `checkFreshness(kb, sidecars, modelId)` reports documents with a missing sidecar, a `doc_hash` mismatch or a model mismatch, and orphaned sidecars. It loads no model and makes no LLM call. `kb check` and the index (step 13) both use it (ADR-006).
+- A shared `checkFreshness(kb, sidecars, modelId)` reports documents with a missing sidecar, a `doc_hash` mismatch or a model mismatch, and orphaned sidecars. It loads no model and makes no LLM call. `mdrag check` and the index (step 13) both use it (ADR-006).
 
 ## Milestone 5: Read path
 
@@ -134,9 +134,9 @@ Status: `planned` · `in-progress` · `done`
 - The package's `exports` expose only this API and its schemas.
 - **Tests:** an end-to-end search and `getDocument` against `examples/kb` using fakes.
 
-### 18. `kb search` CLI · `planned`
+### 18. `mdrag search` CLI · `planned`
 
-- `kb search "<query>" [--mode --limit --min-score --expand --source --tag --since --json]` builds the engine and runs one query.
+- `mdrag search "<query>" [--mode --limit --min-score --expand --source --tag --since --json]` builds the engine and runs one query.
 - Markdown output: for each result, a heading built from the breadcrumb; a line with `source`, `updated` date, `url` and `ref`; then the snippet. It ends with `index_version`, or prints an explicit "no relevant context found" message when there are no results. `--json` prints the `SearchResult` schema instead.
 - **Tests:** snapshot tests of the Markdown renderer.
 
@@ -147,12 +147,12 @@ Status: `planned` · `in-progress` · `done`
   - `GET /documents/{ref}`
   - `GET /healthz`: liveness, ready immediately
   - `GET /readyz`: ready only after the index is built, the models have loaded and a warm-up has run
-- `kb serve [--port]` runs it on `node:http` and shuts down gracefully on SIGTERM. Logs go to stderr.
+- `mdrag serve [--port]` runs it on `node:http` and shuts down gracefully on SIGTERM. Logs go to stderr.
 - **Tests:** health and readiness transitions, a validation error, and a search round trip.
 
 ### 20. Agent setup doc · `planned`
 
-- `docs/agent-setup.md` gives ready-to-paste instructions (a `CLAUDE.md` snippet or skill) that teach an agent when and how to call `kb search` or `POST /search`. The style follows Grapevine's tool descriptions:
+- `docs/agent-setup.md` gives ready-to-paste instructions (a `CLAUDE.md` snippet or skill) that teach an agent when and how to call `mdrag search` or `POST /search`. The style follows Grapevine's tool descriptions:
   - when to use `keyword` mode (identifiers, error codes) and when to use `hybrid` or `semantic`
   - 3–4 worked request examples, including filters and `expand`
   - the exact output format
@@ -164,15 +164,15 @@ Status: `planned` · `in-progress` · `done`
 
 ## Milestone 7: Validation
 
-### 21. `kb eval` with quality metrics · `planned`
+### 21. `mdrag eval` with quality metrics · `planned`
 
 - `examples/eval/queries.yaml` holds entries of the form `{ query, expected: [path or ref], filters? }`, covering each fixture case from step 3.
-- `kb eval` reports Recall@K, MRR and nDCG@N, with a per-query breakdown of misses. `--sidecars <dir>` lets you compare chunkers by pointing at an alternative sidecar set.
+- `mdrag eval` reports Recall@K, MRR and nDCG@N, with a per-query breakdown of misses. `--sidecars <dir>` lets you compare chunkers by pointing at an alternative sidecar set.
 - Ablation flags `--no-rerank` and `--mode <hybrid|keyword|semantic>` measure what each stage contributes (ADR-027).
 - `--save <file>` writes the metrics and per-query ranks as JSON. `--compare <file>` prints the differences against a saved run, both overall and per query (after Grapevine's `search-eval`).
 - **Tests:** metric functions checked against hand-computed worked examples.
 
-### 22. `kb eval --bench` · `planned`
+### 22. `mdrag eval --bench` · `planned`
 
 - Runs warm-up, then the query set repeated R times. Reports p50/p95/p99 for embed, search, rerank and total, and records the hardware (CPU model, core count). Record the results in `docs/benchmarks.md`.
 
@@ -187,5 +187,5 @@ Status: `planned` · `in-progress` · `done`
 
 ### 24. Integrator documentation · `planned`
 
-- `README.md` covers: what the project is, a quick start (`kb embed`, `kb check`, `kb search`, `kb serve`), the library API and the configuration reference.
+- `README.md` covers: what the project is, a quick start (`mdrag embed`, `mdrag check`, `mdrag search`, `mdrag serve`), the library API and the configuration reference.
 - `docs/contract.md` is the full frontmatter contract and sidecar format, written for exporter authors.
