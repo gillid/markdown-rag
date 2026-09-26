@@ -14,7 +14,7 @@ Status: `planned` · `in-progress` · `done`
 - A `mdrag` script (`pnpm mdrag <cmd>`) backed by `src/cli/main.ts`, which dispatches subcommands with `node:util` `parseArgs`. At this stage `pnpm mdrag --help` is the only command.
 - **Done when:** `pnpm lint`, `pnpm typecheck` and `pnpm test` pass on a smoke test.
 
-### 2. Project CI · `planned`
+### 2. Project CI · `done`
 
 - A GitHub Actions workflow runs install, lint, typecheck and test on every PR and on pushes to `main`.
 
