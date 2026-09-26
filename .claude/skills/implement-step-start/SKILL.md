@@ -1,6 +1,7 @@
 ---
 name: implement-step-start
 description: Start (or resume) work on the next PoC implementation step from docs/implementation.md — picks the next planned item, marks it in-progress, branches off main, and begins implementing it. Use when the user asks to start, pick up, or continue the next implementation step.
+disable-model-invocation: true
 ---
 
 # Implement Step: Start

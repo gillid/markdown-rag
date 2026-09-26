@@ -1,6 +1,7 @@
 ---
 name: implement-step-complete
 description: Finish the implementation step currently in progress — marks it done in docs/implementation.md, reconciles docs/design.md if decisions changed, then pushes the branch and opens a PR. Use when the user says a step is finished, ready, or asks to wrap up and open a PR.
+disable-model-invocation: true
 ---
 
 # Implement Step: Complete
