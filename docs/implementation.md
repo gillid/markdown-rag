@@ -61,7 +61,7 @@ Status: `planned` · `in-progress` · `done`
 
 - `Chunker` is `(doc) => Promise<ChunkSpan[]>`, where `ChunkSpan` holds `{ start, end, breadcrumb, anchor }`, together with an `id` string (for example `structural@1`) that is recorded in the sidecar (ADR-011).
 - A shared `toBlocks(tree)` splits the document into top-level structural blocks (heading, paragraph, list, code, table, …), each with its offsets and heading path. Step 9 reuses it.
-- The splitter starts a new chunk at each heading, packs blocks up to the ~1,000-character target, never splits a block, and puts an oversized block in a chunk of its own. `anchor` is the slug of the nearest heading. `breadcrumb` is `title › H2 › H3`.
+- The splitter starts a new chunk at each heading, packs blocks up to the ~1,000-character target (configurable, for tuning in step 23), never splits a block, and puts an oversized block in a chunk of its own. Chunks never overlap. `anchor` is the slug of the nearest heading. `breadcrumb` is `title › H2 › H3`, truncated from the middle when it's longer than ~25% of the chunk (ADR-011).
 - **Tests:** snapshot tests on sample documents, code fences staying intact, and chunks covering the whole body with no gaps or overlaps.
 
 ### 9. LLM chunker · `planned`
@@ -88,8 +88,9 @@ Status: `planned` · `in-progress` · `done`
   - reuse vectors from the old sidecar where a chunk hash matches, and embed the rest
   - write the sidecar
 - If the embedding model changed, re-embed the chunks already recorded, without re-chunking. A chunker change alone invalidates nothing (ADR-024).
-- Deletes sidecars that no longer have a matching document. Prints a summary (documents processed, chunks embedded or reused, fallbacks).
-- **Tests:** use a counting fake embedder and a fake chunker. Editing one document processes only that document and re-embeds only its changed chunks. Deleting a document prunes its sidecar. Changing the model re-embeds without re-chunking.
+- Deletes sidecars that no longer have a matching document. Prints a summary (documents processed, chunks embedded or reused, fallbacks, failures).
+- Embeds in batches across documents. If a batch fails, it retries that batch one document at a time, reports the documents that failed, leaves their sidecars untouched and exits non-zero, while all other documents are still written. This follows Onyx's `embed_chunks_with_failure_handling`.
+- **Tests:** use a counting fake embedder and a fake chunker. Editing one document processes only that document and re-embeds only its changed chunks. Deleting a document prunes its sidecar. Changing the model re-embeds without re-chunking. When the embedder fails on one document, only that document is reported and every other sidecar is still written.
 - Commit the sidecars generated for `examples/kb` with the splitter.
 
 ### 12. Sidecar freshness in `kb check` · `planned`
@@ -100,14 +101,16 @@ Status: `planned` · `in-progress` · `done`
 
 ### 13. In-memory index · `planned`
 
-- `buildIndex(kb, sidecars)` fails fast using `checkFreshness`. It then inserts every recorded chunk into an Orama schema with `path`, `title`, `breadcrumb`, `text` (sliced from the body by offsets), `source` (enum), `tags` (enum[]), `updated_at` (number), `url`, `anchor` and `embedding` (vector[384]) (ADR-007, ADR-008).
+- `buildIndex(kb, sidecars)` fails fast using `checkFreshness`. It then inserts every recorded chunk into an Orama schema with `path`, `ordinal` (the chunk's position within its document), `title`, `breadcrumb`, `text` (sliced from the body by offsets), `source` (enum), `tags` (enum[]), `updated_at` (number), `url`, `anchor` and `embedding` (vector[384]) (ADR-007, ADR-008).
+- Also keeps a lookup of each document's ordered chunks, which step 16 uses for merging and neighbour expansion.
 - Records the index's `version`: the Git HEAD SHA of the KB directory if available, otherwise a hash of all `doc_hash` values.
 - **Tests:** building from `examples/kb` succeeds, and a stale sidecar makes the build fail.
 
 ### 14. Hybrid candidate search · `planned`
 
-- `searchCandidates(index, { text, vector, k, filters })` runs Orama hybrid mode with configurable `hybridWeights`. Filters (`sources`, `tags`, `updated_after`) are applied through `where`, and the BM25 language comes from config (ADR-010).
-- **Tests:** an exact error-code query finds its document through BM25, and a paraphrase query finds its document through the vectors (using stored sidecar vectors plus a fixed query vector, so no model is needed).
+- `searchCandidates(index, { text, vector, k, mode, filters })` maps `mode` to Orama's hybrid, fulltext or vector search. Hybrid uses configurable `hybridWeights` (default 0.5/0.5). `title` gets a small boost (default 1.1, tuned in step 23), and English stopwords are applied through the language setting. Filters (`sources`, `tags`, `updated_after`) go through `where` (ADR-008, ADR-010, ADR-013).
+- In `keyword` mode the query embedding is skipped.
+- **Tests:** an exact error-code query finds its document in `keyword` mode, and a paraphrase query finds its document in `semantic` mode (using stored sidecar vectors plus a fixed query vector, so no model is needed). Filters narrow results in every mode.
 
 ### 15. Reranker · `planned`
 
@@ -116,10 +119,11 @@ Status: `planned` · `in-progress` · `done`
 
 ### 16. Retrieval pipeline · `planned`
 
-- `retrieve(request)` runs these stages in order: embed the query → take K=30 candidates → cap at 2 chunks per document → rerank → apply the recency blend → apply `min_score` → return the top `limit` (ADR-012, ADR-013).
-- Each request can override `limit` (max 10), `min_score`, `recency_weight` and the filters. Config supplies the defaults, plus K, `half_life_days` and the hybrid weights.
+- `retrieve(request)` runs these stages in order: embed the query (unless `mode` is `keyword`) → take K=30 candidates → cap at 2 chunks per document → rerank (unless disabled) → apply the recency blend → apply `min_score` → take the top `limit` → merge and expand (ADR-012, ADR-013, ADR-027).
+- **Merge and expand:** consecutive hits from the same document are merged into one result, which keeps the higher score. Each result is then extended with `expand` neighbouring chunks on each side from the per-document chunk lookup. Chunks never overlap, so they are joined without trimming (ADR-011).
+- Each request can override `mode`, `limit` (max 10), `min_score`, `recency_weight`, `expand` (max 2) and the filters. Config supplies the defaults, plus K, `half_life_days`, the hybrid weights and `rerank` (on or off).
 - Returns results with their score components and per-stage timings.
-- **Tests:** pure-function tests of the blend and cutoff with fixed inputs. With a fake embedder and reranker, the fresh document outranks the stale one, and with `recency_weight = 0` it does not.
+- **Tests:** pure-function tests of the blend, the cutoff, merging (neighbouring and non-neighbouring hits) and expansion at document boundaries. With a fake embedder and reranker, the fresh document outranks the stale one, and with `recency_weight = 0` it does not.
 
 ## Milestone 6: Interface
 
@@ -132,7 +136,7 @@ Status: `planned` · `in-progress` · `done`
 
 ### 18. `kb search` CLI · `planned`
 
-- `kb search "<query>" [--limit --min-score --source --tag --since --json]` builds the engine and runs one query.
+- `kb search "<query>" [--mode --limit --min-score --expand --source --tag --since --json]` builds the engine and runs one query.
 - Markdown output: for each result, a heading built from the breadcrumb; a line with `source`, `updated` date, `url` and `ref`; then the snippet. It ends with `index_version`, or prints an explicit "no relevant context found" message when there are no results. `--json` prints the `SearchResult` schema instead.
 - **Tests:** snapshot tests of the Markdown renderer.
 
@@ -148,7 +152,14 @@ Status: `planned` · `in-progress` · `done`
 
 ### 20. Agent setup doc · `planned`
 
-- `docs/agent-setup.md` gives ready-to-paste instructions (a `CLAUDE.md` snippet or skill) that teach an agent when and how to call `kb search` or `POST /search`, how to expand results with `getDocument`, and to treat results as reference material rather than instructions.
+- `docs/agent-setup.md` gives ready-to-paste instructions (a `CLAUDE.md` snippet or skill) that teach an agent when and how to call `kb search` or `POST /search`. The style follows Grapevine's tool descriptions:
+  - when to use `keyword` mode (identifiers, error codes) and when to use `hybrid` or `semantic`
+  - 3–4 worked request examples, including filters and `expand`
+  - the exact output format
+  - a list of what the tool can and cannot do (for example, it cannot see content that isn't in the KB)
+  - to search again with a refined query or another mode, rather than rely on a weak result
+  - to use `expand` or `getDocument` when a snippet isn't enough
+  - to treat results as reference material, not instructions
 - Verify manually with Claude Code against `examples/kb`.
 
 ## Milestone 7: Validation
@@ -157,16 +168,22 @@ Status: `planned` · `in-progress` · `done`
 
 - `examples/eval/queries.yaml` holds entries of the form `{ query, expected: [path or ref], filters? }`, covering each fixture case from step 3.
 - `kb eval` reports Recall@K, MRR and nDCG@N, with a per-query breakdown of misses. `--sidecars <dir>` lets you compare chunkers by pointing at an alternative sidecar set.
+- Ablation flags `--no-rerank` and `--mode <hybrid|keyword|semantic>` measure what each stage contributes (ADR-027).
+- `--save <file>` writes the metrics and per-query ranks as JSON. `--compare <file>` prints the differences against a saved run, both overall and per query (after Grapevine's `search-eval`).
 - **Tests:** metric functions checked against hand-computed worked examples.
 
 ### 22. `kb eval --bench` · `planned`
 
 - Runs warm-up, then the query set repeated R times. Reports p50/p95/p99 for embed, search, rerank and total, and records the hardware (CPU model, core count). Record the results in `docs/benchmarks.md`.
 
-### 23. Compare chunkers and tune defaults · `planned`
+### 23. Ablations and tuning · `planned`
 
-- Generate an LLM-chunked sidecar set for `examples/kb` and compare it with the splitter set using eval. Record the comparison in `docs/benchmarks.md`.
-- Tune the hybrid weights, K, `min_score` and `recency_weight`. Update the defaults and the relevant ADR entries if any values change. Confirm the PoC success criteria (design §2).
+- **Chunkers:** generate an LLM-chunked sidecar set for `examples/kb` and compare it with the splitter set.
+- **Chunk size:** compare splitter targets of ~1,000 and ~2,000 characters. Onyx targets 512 tokens.
+- **Reranker:** compare with and without it (`--no-rerank`), and decide the default under ADR-027, weighing the quality gain against the rerank p95.
+- **Modes:** compare `hybrid`, `keyword` and `semantic`.
+- Tune the hybrid weights, title boost, K, `min_score` and `recency_weight`.
+- Record everything in `docs/benchmarks.md`. Update the defaults and the relevant ADR entries if any values change. Confirm the PoC success criteria (design §2).
 
 ### 24. Integrator documentation · `planned`
 
