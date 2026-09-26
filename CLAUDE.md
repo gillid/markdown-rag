@@ -11,11 +11,11 @@ An open-source engine that serves a Git repository of Markdown files to AI agent
 - **Write-time LLM chunking (optional):** `ai` (AI SDK) with `@ai-sdk/anthropic`. The default model is `claude-haiku-4-5`, and the key is read from `ANTHROPIC_API_KEY`.
 - **Parsing and validation:** `mdast-util-from-markdown`, `mdast-util-frontmatter`, `yaml`, `zod`
 - **HTTP:** `node:http`, with no framework
-- **Tooling:** Biome (lint and format), Vitest (tests)
+- **Tooling:** Biome (lint and format), Vitest (tests), Lefthook (git hooks)
 
 ## Commands
 
-The scaffold is planned in step 1 of `docs/implementation.md`. Keep this list in sync with `package.json`.
+Keep this list in sync with `package.json`.
 
 | Command | Purpose |
 | --- | --- |
@@ -28,6 +28,8 @@ The scaffold is planned in step 1 of `docs/implementation.md`. Keep this list in
 | `pnpm test:models` | Model-backed tests (`*.models.test.ts`); downloads models on first run |
 
 Before reporting work as done, run `pnpm lint:fix`, `pnpm typecheck` and `pnpm test`.
+
+`pnpm install` runs `lefthook install` (via the `prepare` script), which wires up a pre-commit hook that runs Biome (`--write`, restaging fixes) on staged files and `pnpm typecheck` on the whole project. See `lefthook.yml`.
 
 ## Practices
 
