@@ -18,7 +18,7 @@ Status: `planned` · `in-progress` · `done`
 
 - A GitHub Actions workflow runs install, lint, typecheck and test on every PR and on pushes to `main`.
 
-### 3. Sample knowledge base · `planned`
+### 3. Sample knowledge base · `done`
 
 - `examples/kb/`: ~20–30 realistic documents with valid frontmatter across 3–4 `source`s, including runbooks, decisions, API notes and chat-style threads.
 - The documents deliberately include:
