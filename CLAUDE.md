@@ -1,0 +1,70 @@
+# CLAUDE.md
+
+An open-source engine that serves a Git repository of Markdown files to AI agents. It combines in-memory hybrid search (BM25 + vectors) with local reranking, and has no database and no external services on the query path. Chunks and vectors are precomputed at write time into per-document sidecars. Read [docs/design.md](docs/design.md) before making non-trivial changes.
+
+## Tech Stack
+
+- **Runtime:** Node.js 24 LTS, ESM. TypeScript runs directly through native type stripping (no build step), with `tsc --noEmit` for type-checking only. Use erasable syntax only: no `enum`, no `namespace`, no parameter properties.
+- **Package manager:** pnpm
+- **Search:** `@orama/orama` (in-process hybrid index)
+- **Query-path models (local):** `@huggingface/transformers` on `onnxruntime-node`. The embedder is `Xenova/bge-small-en-v1.5` and the reranker is `Xenova/ms-marco-MiniLM-L-6-v2` (q8).
+- **Write-time LLM chunking (optional):** `ai` (AI SDK) with `@ai-sdk/anthropic`. The default model is `claude-haiku-4-5`, and the key is read from `ANTHROPIC_API_KEY`.
+- **Parsing and validation:** `mdast-util-from-markdown`, `mdast-util-frontmatter`, `yaml`, `zod`
+- **HTTP:** `node:http`, with no framework
+- **Tooling:** Biome (lint and format), Vitest (tests)
+
+## Commands
+
+The scaffold is planned in step 1 of `docs/implementation.md`. Keep this list in sync with `package.json`.
+
+| Command | Purpose |
+| --- | --- |
+| `pnpm install` | Install dependencies |
+| `pnpm kb <cmd>` | Run the CLI: `embed`, `check`, `search`, `serve`, `eval` |
+| `pnpm start` | `kb serve` (HTTP API) with the configured KB |
+| `pnpm lint` / `pnpm lint:fix` | Biome check / apply fixes and formatting |
+| `pnpm typecheck` | `tsc --noEmit` |
+| `pnpm test` | Unit tests; no model downloads and no LLM calls |
+| `pnpm test:models` | Model-backed tests (`*.models.test.ts`); downloads models on first run |
+
+Before reporting work as done, run `pnpm lint:fix`, `pnpm typecheck` and `pnpm test`.
+
+## Practices
+
+- **Every behaviour change is checked against its ADR.** If a change contradicts a decision in `docs/design.md` §4, update or supersede that ADR in the same PR.
+- **One step, one PR.** Work follows `docs/implementation.md`. Set the step's status (`planned` → `in-progress` → `done`) in the same PR.
+- **Sidecars are the contract between the write path and the read path.** A sidecar is fresh if and only if its `doc_hash` and embedding model match. Sidecar output must be byte-stable. Stale sidecars must fail fast and must never be patched over at runtime.
+- **The query path never makes network calls.** The only network access is downloading models into the cache and, at write time only, the optional LLM chunker.
+- **The LLM never rewrites content.** It only groups block IDs, its output is always validated, and the splitter is the fallback.
+- **The library API is the extension point.** Advanced layers compose on `createEngine()`. Don't add plugin or hook systems.
+- **Tests use the `examples/kb` fixture and golden queries.** Expected values come from hand-written literals or worked examples. Model-dependent assertions go in `*.models.test.ts`. LLM behaviour is tested with AI SDK mock models only.
+- **Paths:** document identity uses POSIX paths relative to the KB root. Line endings are normalised to LF before hashing.
+
+## References
+
+| What | Where |
+| --- | --- |
+| Idea, PoC scope, what's deferred, ADR log | `docs/design.md` |
+| Step-by-step PoC plan with statuses | `docs/implementation.md` |
+| Document contract and sidecar format (for exporters) | `docs/contract.md` (planned, step 24) |
+| Agent setup prompt | `docs/agent-setup.md` (planned, step 20) |
+| Benchmark and chunker comparison | `docs/benchmarks.md` (planned, steps 22–23) |
+| Sample KB and golden queries | `examples/kb/`, `examples/eval/` (planned, steps 3, 21) |
+| CLI entry and subcommands | `src/cli/` |
+| Runtime config | `src/config/` |
+| KB loading and contract validation | `src/contract/` |
+| Sidecar format, freshness, `kb embed` | `src/sidecars/` |
+| Chunkers (structure-aware splitter, LLM) | `src/chunking/` |
+| Embedder and reranker | `src/models/` |
+| Orama index and candidate search | `src/index/` |
+| Retrieval pipeline (rerank, recency, cutoff) | `src/retrieval/` |
+| Library API (`createEngine`, schemas) | `src/engine/` |
+| HTTP handler and `kb serve` | `src/http/` |
+| Eval and benchmarks | `src/eval/` |
+| Orama docs | https://docs.orama.com |
+| transformers.js docs | https://huggingface.co/docs/transformers.js |
+| AI SDK docs | https://ai-sdk.dev/docs |
+
+## Keeping Docs Current
+
+When you change the stack, commands, practices, module layout or a design decision, update this file, `docs/design.md` (including the ADR log) and `docs/implementation.md` in the same change. A stale doc is treated as a bug.
