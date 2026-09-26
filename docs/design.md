@@ -1,6 +1,6 @@
 # Design: Static-Indexed In-Memory Context Gateway
 
-Status: Draft v4 · Last updated: 2026-09-26
+Status: Draft v5 · Last updated: 2026-09-26
 
 ## 1. The Idea
 
@@ -50,14 +50,18 @@ This project is an **open-source engine** that makes a Git repository of Markdow
 2. It builds the Orama index from the recorded chunks and loads the query embedder and the reranker. After a warm-up it reports ready.
 3. For each query:
    - embed the query
-   - retrieve hybrid candidates (optionally filtered)
+   - retrieve candidates using hybrid, keyword-only or semantic-only search (optionally filtered)
    - cap the number of chunks per document
    - rerank with the cross-encoder
    - blend in recency
    - apply the score cutoff
-   - return the top N results, each with its citation
+   - take the top N results
+   - merge adjacent hits from the same document, and optionally expand each hit with its neighbouring chunks
+   - return the results with citations
 
-   Each request can override the result count, the cutoff, the recency weight and the filters.
+   Each request can override the search mode, result count, cutoff, recency weight, neighbour expansion and filters.
+
+There is no LLM on the query path. The calling agent is already an LLM: it reformulates queries and searches again. The engine's job is to make each call fast and precise (ADR-025).
 
 **Updating a deployment** means restarting the server against a newer checkout. How and where it runs is up to the integrator (ADR-017).
 
@@ -72,7 +76,7 @@ Details and rejected options are in the [ADR log](#4-decision-log-adr).
 - **Search:** Orama in-process hybrid search (ADR-008).
 - **Query-path models:** local only, through transformers.js on `onnxruntime-node`. The embedder is `bge-small-en-v1.5` and the reranker is `ms-marco-MiniLM-L-6-v2`. Both sit behind interfaces, so external providers could be added later (ADR-009, ADR-010, ADR-022).
 - **Interface:** a library (`createEngine`), HTTP JSON (`createHttpHandler` / `kb serve`) and a CLI (`kb search`). There's no MCP adapter and no auth in the PoC (ADR-014, ADR-016).
-- **Scoring:** reranker score blended with recency after reranking. The cutoff, result count and recency weight have configured defaults that each request can override (ADR-012, ADR-013).
+- **Scoring:** reranker score blended with recency after reranking. The search mode, cutoff, result count, recency weight and neighbour expansion have configured defaults that each request can override (ADR-012, ADR-013). The reranker has to prove its value in eval (ADR-027).
 
 ### 1.3 Guarantees and targets
 
@@ -97,26 +101,28 @@ The PoC is the smallest system that proves the idea end to end: an agent gets re
 5. **`kb check`:** validates the contract and checks sidecar freshness, with no model and no LLM. Exits non-zero on failure.
 6. **In-memory index:** built from sidecars at startup, failing fast on stale sidecars.
 7. **Retrieval pipeline:**
-   - Orama hybrid candidates, with filters on `sources`, `tags` and `updated_after`
+   - Orama candidates in `hybrid`, `keyword` or `semantic` mode, with a boosted title field, English stopwords, and filters on `sources`, `tags` and `updated_after`
    - a per-document cap
    - cross-encoder reranking
    - a recency blend
-   - a score cutoff and top N, with per-request overrides
+   - a score cutoff and top N
+   - adjacent-chunk merging and optional neighbour expansion
+   - per-request overrides for all of the above
 8. **Library API:** `createEngine(config)` exposing `search()` and `getDocument()`, plus exported zod schemas for requests and results, which is the extension point for advanced layers.
 9. **HTTP API:**
    - `POST /search` and `GET /documents/{ref}`
    - `/healthz` and `/readyz`
    - `createHttpHandler(engine)`, so integrators can mount it in their own server, and `kb serve`, which runs it standalone
 10. **CLI:** `kb search "<query>"`, with Markdown output by default and a `--json` option.
-11. **Agent setup doc:** a prompt/skill snippet that teaches an agent (e.g. Claude Code) to use the HTTP API or the CLI.
-12. **Evaluation:** `kb eval` runs golden queries and reports Recall@K, MRR and nDCG@N. `--bench` adds per-stage latency percentiles.
+11. **Agent setup doc:** a prompt/skill snippet that teaches an agent (e.g. Claude Code) to use the HTTP API or the CLI. It covers when to use each search mode, gives worked request examples, shows the output format, lists what the tool can and cannot do, and tells the agent to search again with a refined query rather than rely on a weak result.
+12. **Evaluation:** `kb eval` runs golden queries and reports Recall@K, MRR and nDCG@N. `--bench` adds per-stage latency percentiles. Ablation flags (`--no-rerank`, `--mode`) measure what each stage contributes, and `--save` / `--compare` diff against a saved baseline run.
 13. **Sample KB and golden queries:** checked into the repo and used by tests, eval and the demo.
 14. **Integrator documentation:** the contract, the sidecar format, the commands and the configuration.
 
 ### Success criteria
 
 - An agent can answer questions from `examples/kb` through the HTTP API and through `kb search`, with correct citations.
-- On the sample KB, `kb eval` reaches Recall@30 ≥ 0.9 and MRR ≥ 0.7 with both chunkers. Thresholds will be revisited once the sample set exists. The eval also shows how the LLM chunker compares with the splitter.
+- On the sample KB, `kb eval` reaches Recall@30 ≥ 0.9 and MRR ≥ 0.7 with both chunkers. Thresholds will be revisited once the sample set exists. The eval also shows how the LLM chunker compares with the splitter, and whether reranking improves results enough to justify its latency.
 - `kb eval --bench` meets the §1.3 latency target on reference hardware.
 - Editing one document and running `kb embed` re-processes only that document, and re-embeds only its changed chunks.
 - Without an LLM configured, `kb embed` works end to end using the splitter.
@@ -129,13 +135,13 @@ These are deliberately left out of the PoC. Each one is useful but not needed to
 | --- | --- |
 | MCP adapter (a thin wrapper over the library) | The HTTP API, the CLI and a setup doc are enough for agents (ADR-014) |
 | Auth (bearer, OIDC, mTLS) and per-user ACLs | An integration concern that belongs at the ingress (ADR-016) |
-| Contextual enrichment: an LLM-written context line per chunk, prepended before embedding | Proven gains, but it needs the LLM chunker working first. It can come from the same LLM call (ADR-024) |
+| Contextual enrichment: an LLM-written document summary and context line per chunk, prepended before embedding | Proven gains, and Onyx ships it on by default (~50-token document summary, ~64-token chunk context). It needs the LLM chunker working first and can come from the same LLM call (ADR-024) |
+| Link-graph boost from Markdown links between KB documents | Grapevine boosts documents that many others reference. It could help cross-linked KBs, but it needs link extraction and eval evidence (ADR-026) |
 | External embedding and reranking providers | Local models are enough under A1 and A2. The interfaces already allow adding them (ADR-009) |
 | Serialised index snapshot for faster startup | Only worth it near the corpus ceiling (ADR-007) |
 | Reference GitHub Actions workflow for KB repos (`kb embed` on push, `kb check` gate, eval regression gate) | An integration concern; the commands make it a few lines of YAML |
 | Example exporters (Slack, Confluence, GitHub) | Ingestion is out of scope (ADR-001) |
 | Per-source recency settings | Global settings are enough to validate the blend |
-| Merging adjacent chunks into one snippet | Cosmetic |
 | Prometheus metrics and opt-in query logging | The PoC needs only stderr logs and `--bench` |
 | Multilingual model presets | English is assumed (A2) |
 | Vector quantisation in sidecars (f16/int8) | Reduces repo growth (A7); not needed at PoC scale |
@@ -173,17 +179,17 @@ Each record: **Decision**, then **Why**, then **Rejected** options. Superseded r
 
 **ADR-007 · The index is built in memory at startup from the sidecars, with no serialised artifact.** *Why:* with chunks and vectors already recorded, indexing takes seconds at PoC scale. *Rejected (deferred):* an Orama snapshot. *Rejected:* hot reload.
 
-**ADR-008 · Orama provides in-process hybrid search.** *Why:* BM25 and vector search in one index and one query, with zero-dependency JavaScript and filters built in. *Rejected:* MiniSearch or Lunr plus a separate ANN library (results must be fused by hand); an external search service.
+**ADR-008 · Orama provides in-process hybrid search. The title is indexed as a separate field with a small boost, and also appears in the chunk's breadcrumb.** *Why:* BM25 and vector search in one index and one query, with zero-dependency JavaScript and filters built in. The title acts as a boost rather than a separate signal, as in Onyx, whose title-to-content weight is 0.10. *Rejected:* MiniSearch or Lunr plus a separate ANN library (results must be fused by hand); an external search service.
 
 **ADR-009 · Query-path models are local only (transformers.js on `onnxruntime-node`), behind `Embedder` and `Reranker` interfaces.** *Why:* private, free per query, no network latency, no tokens to manage. The interfaces already exist for test fakes, so an external provider could be added later without redesign. *Rejected:* external embedding and reranking APIs in the PoC (token plumbing and latency, with no quality need under A1 and A2); `flashrank-js` (FlashRank is Python-only).
 
-**ADR-010 · Default query-path models are `Xenova/bge-small-en-v1.5` and `Xenova/ms-marco-MiniLM-L-6-v2` (q8), pinned by revision. One language setting drives both the models and the BM25 tokeniser.** *Why:* small, fast, strong on English (A2), and compatible licences. *Rejected:* `bge-reranker-base` as the default (too slow for the latency target on 2 vCPU; kept as an option).
+**ADR-010 · Default query-path models are `Xenova/bge-small-en-v1.5` and `Xenova/ms-marco-MiniLM-L-6-v2` (q8), pinned by revision. One language setting drives the models, the BM25 tokeniser and the BM25 stopword list.** *Why:* small, fast, strong on English (A2), and compatible licences. *Rejected:* `bge-reranker-base` as the default (too slow for the latency target on 2 vCPU; kept as an option).
 
-**ADR-011 · Chunking is a pluggable write-time strategy that produces recorded chunks. The structure-aware splitter is always available: it splits on headings, then block boundaries, never splits code blocks, prefixes a breadcrumb, and caps chunk size (~1,000 characters target, ~2,000 maximum).** *Why:* structure-aware splitting is the strong baseline for Markdown. Published comparisons show inconsistent gains from semantic chunking over it. The character cap only keeps chunks within the reranker's input window. *Supersedes:* the v3 decision that the chunker must be deterministic because the server re-chunks at startup. *Rejected:* fixed-size windows (split code blocks and sections apart).
+**ADR-011 · Chunking is a pluggable write-time strategy that produces recorded chunks. The structure-aware splitter is always available: it splits on headings, then block boundaries, never splits code blocks, prefixes a breadcrumb capped at ~25% of the chunk, and caps chunk size (~1,000 characters target, ~2,000 maximum; the target is tuned in eval). Chunks never overlap.** *Why:* structure-aware splitting is the strong baseline for Markdown. Published comparisons show inconsistent gains from semantic chunking over it. The character cap only keeps chunks within the reranker's input window. Zero overlap and query-time neighbour expansion (ADR-013) go together: overlap would pay at write time, in duplicated text and vectors for every chunk, for context that expansion supplies only when a query asks for it. Without overlap, adjacent chunks also join cleanly. Onyx makes the same pairing (`CHUNK_OVERLAP=0`, "unclear if overlaps actually help"). The breadcrumb cap stops deep headings from crowding out content, following Onyx's 25% limit on metadata. *Supersedes:* the v3 decision that the chunker must be deterministic because the server re-chunks at startup. *Rejected:* fixed-size windows (split code blocks and sections apart).
 
-**ADR-012 · Recency is blended after reranking: `final = (1−w)·σ(rerank) + w·0.5^(age/half_life)`.** *Why:* any score applied before the reranker is thrown away by it. Recency should break ties, never replace relevance. *Rejected:* decay inside retrieval.
+**ADR-012 · Recency is blended after reranking: `final = (1−w)·σ(rerank) + w·0.5^(age/half_life)`.** *Why:* any score applied before the reranker is thrown away by it. Recency should break ties, never replace relevance. Because the blend is additive, an old document can lose at most `w` (15% by default), so it never decays to zero. That is the same property as Onyx's multiplicative recency floor of 0.75. *Rejected:* decay inside retrieval; unbounded multiplicative decay.
 
-**ADR-013 · The result count (default 3, max 10), minimum score, recency weight and filters have configured defaults and can be overridden per request. Results are always capped at 2 chunks per document.** *Why:* different callers want different precision/recall trade-offs, and returning no result is better than padding the agent's context with noise. *Rejected:* a fixed top 3; config-only settings.
+**ADR-013 · These settings have configured defaults and can be overridden per request: search `mode` (`hybrid` by default, or `keyword` or `semantic`), result count (default 3, max 10), minimum score, recency weight, neighbour `expand` (default 0, max 2 chunks on each side) and filters. Results are always capped at 2 chunks per document, and adjacent hits from one document are merged into a single result.** *Why:* different callers want different precision/recall trade-offs, and returning no result is better than padding the agent's context with noise. `keyword` mode lets an agent force exact matching for identifiers, following Grapevine's separate keyword and semantic tools, without giving up fused hybrid search as the default. Expansion supplies surrounding context only when it's asked for (Onyx expands 1 chunk above and below by default). *Rejected:* a fixed top 3; config-only settings; separate keyword and semantic endpoints (a mode parameter is enough).
 
 **ADR-014 · The PoC interface is a library API, HTTP JSON on `node:http`, and a CLI, plus an agent setup doc. MCP is deferred.** *Why:* the library is the basic layer that advanced layers compose on. HTTP and the CLI are enough for agents, given a setup prompt. An MCP adapter is a thin wrapper that can be added later. *Rejected:* MCP in the PoC; Fastify or Express (unneeded dependencies).
 
@@ -206,3 +212,9 @@ Each record: **Decision**, then **Why**, then **Rejected** options. Superseded r
 **ADR-023 · Frontmatter is parsed in the same mdast pass as the Markdown (`mdast-util-frontmatter` plus `yaml`) and validated with zod.** *Why:* the Markdown is already parsed with mdast for chunking, and a second parser would be redundant. *Rejected:* gray-matter (last released in 2019, depends on the outdated js-yaml 3).
 
 **ADR-024 · The LLM chunker is lean. The document is first split into structural blocks with IDs. The LLM (AI SDK `generateObject`, Claude Haiku 4.5 by default, temperature 0) returns only groups of consecutive block IDs. The output is validated: it must be complete, ordered, non-overlapping and within the size cap. If validation fails or the call errors, that document uses the splitter. The LLM chunker is used only when a model is configured.** *Why:* grouping by block ID means the LLM can never rewrite or drop text, keeps the output small and cheap, and makes validation trivial. The fallback means a missing key or a failed call never blocks `kb embed`. Chunks are recorded in the sidecar (ADR-005), so the LLM's non-determinism doesn't matter. Changing the chunker does not invalidate existing sidecars, and `kb embed --rechunk` re-chunks on demand. *Rejected:* the LLM returning chunk text (can alter content and costs more output tokens); LLM-only chunking with no fallback; re-chunking automatically whenever the chunker config changes (an unexpected LLM bill).
+
+**ADR-025 · There is no LLM on the query path.** *Why:* the caller is already an LLM agent that can reformulate its query and search again. Putting LLM calls inside search would add seconds of latency and per-query cost, and would break ADR-019. Onyx's agentic search does use up to 6 LLM cycles (query expansion, then fusing results by rank, then LLM section selection, then LLM expansion), but it serves users who are not themselves agents. *Rejected:* multi-query generation with rank fusion, LLM relevance filtering or section selection, and an `ask_agent`-style endpoint that answers questions (Grapevine).
+
+**ADR-026 · No extra index-time representations in the PoC: no mini-chunks or large chunks with their own embeddings, and no separate title embeddings. The link-graph boost is deferred.** *Why:* each one multiplies index size and write cost, and there's no evidence they help at our scale (A1) with structure-aware chunks and breadcrumbs. Onyx keeps its multi-pass indexing behind a flag. *Rejected:* Onyx multi-pass indexing; separate keyword and vector stores (Grapevine uses OpenSearch plus Turbopuffer, and Orama already combines both).
+
+**ADR-027 · The cross-encoder reranker is kept provisionally and must earn its place in eval.** *Why:* neither reference project uses one on its live path. Grapevine uses a linear blend of scores, and Onyx has cross-encoder code but only runs it at warm-up. It is still the only local precision step we have without an LLM (ADR-025). `kb eval --no-rerank` measures what it adds against its ~80 ms. If the gain is marginal, the default becomes off and this ADR is superseded. *Rejected:* dropping it without measuring; replacing it with an LLM (ADR-025).
