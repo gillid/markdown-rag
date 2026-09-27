@@ -20,7 +20,7 @@ Keep this list in sync with `package.json`.
 | --- | --- |
 | `pnpm install` | Install dependencies |
 | `pnpm md-rag <cmd>` | Run the CLI: `embed`, `check`, `search`, `serve`, `eval` |
-| `pnpm start` | `mdrag serve` (HTTP API) with the configured storage |
+| `pnpm start` | `md-rag serve` (HTTP API) with the configured storage |
 | `pnpm lint` / `pnpm lint:fix` | Biome check / apply fixes and formatting |
 | `pnpm typecheck` | `tsc --noEmit` |
 | `pnpm test` | Unit tests; no model downloads and no LLM calls |
@@ -34,7 +34,9 @@ Before reporting work as done, run `pnpm lint:fix`, `pnpm typecheck` and `pnpm t
 
 - **Every behaviour change is checked against its ADR.** If a change contradicts a decision in `docs/design.md` §4, update or supersede that ADR in the same PR.
 - **One step, one PR.** Work follows `docs/implementation.md`. Set the step's status (`planned` → `in-progress` → `done`) in the same PR.
-- **Sidecars are the contract between the write path and the read path.** A sidecar is fresh if and only if its `doc_hash` and embedding model match. Sidecar output must be byte-stable. Stale sidecars must fail fast and must never be patched over at runtime.
+- **Sidecars are the contract between the write path and the read path.** A sidecar is fresh if and only if its `doc_hash` matches its document and its embedding model matches the one all sidecars share. Sidecar output must be byte-stable. Stale sidecars must fail fast and must never be patched over at runtime.
+- **Engine-owned files live only in `<root>/.md-rag/`** (sidecars, git-ignored model cache). Every file in it is generated; never add a hand-edited one, and never write anywhere else in a knowledge base (ADR-031).
+- **No environment variables.** Configuration arrives only through CLI flags or the object passed to `createEngine`; there is no config file. The embedding model comes from the sidecars (ADR-032).
 - **Neither path makes network calls.** The only network access is downloading model weights into the cache.
 - **The library API is the extension point.** Advanced layers compose on `createEngine()`. Don't add plugin or hook systems.
 - **Tests use the `examples/docs` fixture and golden queries.** Expected values come from hand-written literals or worked examples. Model-dependent assertions go in `*.models.test.ts`.
@@ -53,13 +55,13 @@ Before reporting work as done, run `pnpm lint:fix`, `pnpm typecheck` and `pnpm t
 | CLI entry and subcommands | `src/cli/` |
 | Runtime config | `src/config/` |
 | Storage loading and contract validation | `src/contract/` |
-| Sidecar format, freshness, `mdrag embed` | `src/sidecars/` |
+| Sidecar format, freshness, `md-rag embed` | `src/sidecars/` |
 | Chunker (structure-aware splitter) | `src/chunking/` |
 | Embedder and reranker | `src/models/` |
 | Orama index and candidate search | `src/index/` |
 | Retrieval pipeline (rerank, recency, cutoff) | `src/retrieval/` |
 | Library API (`createEngine`, schemas) | `src/engine/` |
-| HTTP handler and `mdrag serve` | `src/http/` |
+| HTTP handler and `md-rag serve` | `src/http/` |
 | Eval and benchmarks | `src/eval/` |
 | Orama docs | https://docs.orama.com |
 | transformers.js docs | https://huggingface.co/docs/transformers.js |

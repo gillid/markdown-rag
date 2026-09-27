@@ -34,27 +34,27 @@ Status: `planned` · `in-progress` · `done`
 
 ### 4. Config module · `planned`
 
-- A single `loadConfig()` combines defaults, an optional `mdrag.config.json` in the knowledge base root, `MDRAG_*` environment variables and CLI flags, in increasing order of precedence, validated with zod.
-- It starts with the knowledge base directory only. Every later step adds the fields it needs. No placeholder fields.
+- A single `loadConfig({ root, overrides })` merges built-in defaults with the caller's overrides (CLI flags, or the object passed to `createEngine`). One zod schema validates the result. There's no config file, and it reads no environment variables (ADR-032).
+- It starts with the knowledge base directory only (`--root`, defaulting to the current directory). Every later step adds the fields it needs. No placeholder fields.
 
 ## Milestone 2: Content model
 
 ### 5. Knowledge base loader and document contract · `planned`
 
-- `loadKnowledgeBase(root)` walks `**/*.md`, skipping dot-directories (including `.vectors/`).
+- `loadKnowledgeBase(root)` walks `**/*.md`, skipping dot-directories (including the engine's `.md-rag/`, ADR-031).
 - Line endings are normalised to LF. `doc_hash` = `sha256` of the normalised file (ADR-005).
 - The document is parsed once with `mdast-util-from-markdown` plus `mdast-util-frontmatter`. The YAML node is read with `yaml` and validated with zod: `title`, `source` and `updated_at` are required; `url` and `tags` are optional; unknown keys are kept as `meta` (ADR-003, ADR-023).
 - Errors are collected across all files and reported together (path plus reason). Enforces the 1 MB size limit.
 - Returns documents containing `path` (POSIX, relative to the root), `docHash`, the parsed tree, the body, and typed metadata (`updated_at` as epoch milliseconds).
 - **Tests:** valid and invalid fixtures; CRLF and LF versions of a file give the same hash.
 
-### 6. `mdrag check` (contract only) · `planned`
+### 6. `md-rag check` (contract only) · `planned`
 
 - A CLI command that runs the loader and exits non-zero with the aggregated errors. Sidecar freshness is added in step 12.
 
 ### 7. Sidecar format · `planned`
 
-- Read and write `.vectors/<doc-path>.vec.json` with the fields `{ format: 1, doc_hash, chunker, model, dims, chunks: [{ start, end, breadcrumb, anchor, hash, vector }] }` (ADR-005).
+- Read and write `.md-rag/vectors/<doc-path>.vec.json` with the fields `{ format: 1, doc_hash, chunker, model, dims, chunks: [{ start, end, breadcrumb, anchor, hash, vector }] }` (ADR-005, ADR-031).
 - `start` and `end` are offsets into the normalised body. `hash` = `sha256(breadcrumb + "\n" + text)`. `vector` is base64-encoded little-endian float32.
 - The output is written deterministically (stable key order, trailing newline), so unchanged input produces a byte-identical file.
 - **Tests:** round trip, a byte-exact literal fixture, and offsets resolving back to the expected text.
@@ -79,24 +79,25 @@ Status: `planned` · `in-progress` · `done`
 ### 10. Embedder · `planned`
 
 - An `Embedder` interface (`embedDocuments`, `embedQuery`, `modelId`, `dims`) and a transformers.js implementation: `feature-extraction` with mean pooling and normalisation, q8 weights, and a pinned model revision (ADR-009, ADR-010).
-- Config covers the model cache directory and whether remote models are allowed (ADR-022). The model loads lazily, once. The BGE query instruction prefix is applied only to queries.
+- Config covers the model cache directory (`modelsDir`, default `<root>/.md-rag/models/`, overridable with `--models-dir`) and whether remote models are allowed (ADR-022, ADR-031). Both are passed to transformers.js explicitly, never through environment variables (ADR-032). The model loads lazily, once. The BGE query instruction prefix is applied only to queries.
+- A shared `ensureEngineDir(root)` creates `.md-rag/` and writes `.md-rag/.gitignore` (ignoring `models/`) with its canonical content, overwriting any edits, since nothing in `.md-rag/` is hand-edited (ADR-031). Model loading calls it before anything is downloaded into the default cache, and step 11 reuses it.
 - **Tests:** a `*.models.test.ts` checks that a paraphrase pair outscores an unrelated pair, and that vectors have 384 dimensions and are L2-normalised.
 
-### 11. `mdrag embed` · `planned`
+### 11. `md-rag embed` · `planned`
 
 - For each document whose `doc_hash` differs from its sidecar (or that has no sidecar, or with `--rechunk`):
   - chunk it with the configured chunker
   - reuse vectors from the old sidecar where a chunk hash matches, and embed the rest
-  - write the sidecar
-- If the embedding model changed, re-embed the chunks already recorded, without re-chunking. A chunker change alone invalidates nothing (ADR-024).
+  - write the sidecar to `.md-rag/vectors/`, creating the folder through `ensureEngineDir` on first run (ADR-031)
+- The model defaults to the one the existing sidecars record, and to the built-in default for a fresh knowledge base. Only an explicit `--model` switches it; `embed` then re-embeds the chunks already recorded, without re-chunking. If the sidecars record more than one model (for example, after an interrupted switch), `embed` without `--model` exits with an error asking for one (ADR-032). A chunker change alone invalidates nothing (ADR-024).
 - Deletes sidecars that no longer have a matching document. Prints a summary (documents processed, chunks embedded or reused, fallbacks, failures).
 - Embeds in batches across documents. If a batch fails, it retries that batch one document at a time, reports the documents that failed, leaves their sidecars untouched and exits non-zero, while all other documents are still written. This follows Onyx's `embed_chunks_with_failure_handling`.
-- **Tests:** use a counting fake embedder and a fake chunker. Editing one document processes only that document and re-embeds only its changed chunks. Deleting a document prunes its sidecar. Changing the model re-embeds without re-chunking. When the embedder fails on one document, only that document is reported and every other sidecar is still written.
-- Commit the sidecars generated for `examples/docs` with the splitter.
+- **Tests:** use a counting fake embedder and a fake chunker. Editing one document processes only that document and re-embeds only its changed chunks. Deleting a document prunes its sidecar. Without `--model`, a knowledge base embedded with a non-default model keeps that model; `--model` re-embeds without re-chunking. When the embedder fails on one document, only that document is reported and every other sidecar is still written. The first run on a fresh knowledge base creates `.md-rag/.gitignore`, and an edited one is restored to its canonical content.
+- Commit `examples/docs/.md-rag/` (the sidecars generated with the splitter, plus its `.gitignore`).
 
-### 12. Sidecar freshness in `mdrag check` · `planned`
+### 12. Sidecar freshness in `md-rag check` · `planned`
 
-- A shared `checkFreshness(storage, sidecars, modelId)` reports documents with a missing sidecar, a `doc_hash` mismatch or a model mismatch, and orphaned sidecars. It loads no model and makes no LLM call. `mdrag check` and the index (step 13) both use it (ADR-006).
+- A shared `checkFreshness(storage, sidecars)` reports documents with a missing sidecar or a `doc_hash` mismatch, orphaned sidecars, and sidecars whose recorded model differs from the rest. On success it returns the one model ID they share, which the read path loads (ADR-006, ADR-032). A model ID the engine has no preset for is also an error. It loads no model and makes no LLM call. `md-rag check` and the index (step 13) both use it (ADR-006). When `.md-rag/vectors/` doesn't exist yet, the error says to run `md-rag embed` first (ADR-031).
 
 ## Milestone 5: Read path
 
@@ -130,14 +131,14 @@ Status: `planned` · `in-progress` · `done`
 
 ### 17. Library API · `planned`
 
-- `createEngine(config)` returns `{ search(request), getDocument(ref), ready(), version }`. zod schemas for `SearchRequest`, `SearchResult` and `Document` are exported. This is the basic layer, and advanced layers compose on it (ADR-014, ADR-015).
+- `createEngine(config)` takes `{ root, ...overrides }`, resolves them through `loadConfig` (step 4, ADR-032) and returns `{ search(request), getDocument(ref), ready(), version }`. zod schemas for `SearchRequest`, `SearchResult` and `Document` are exported. This is the basic layer, and advanced layers compose on it (ADR-014, ADR-015).
 - `getDocument(ref)` resolves `<path>` or `<path>#<anchor>` to the whole document or one section. Only indexed paths can be resolved, which blocks path traversal.
-- The package's `exports` expose only this API and its schemas.
+- The package's `exports` expose only this API and its schemas. Step 19.1 publishes them.
 - **Tests:** an end-to-end search and `getDocument` against `examples/docs` using fakes.
 
-### 18. `mdrag search` CLI · `planned`
+### 18. `md-rag search` CLI · `planned`
 
-- `mdrag search "<query>" [--mode --limit --min-score --expand --source --tag --since --json]` builds the engine and runs one query.
+- `md-rag search "<query>" [--mode --limit --min-score --expand --source --tag --since --json]` builds the engine and runs one query.
 - Markdown output: for each result, a heading built from the breadcrumb; a line with `source`, `updated` date, `url` and `ref`; then the snippet. It ends with `index_version`, or prints an explicit "no relevant context found" message when there are no results. `--json` prints the `SearchResult` schema instead.
 - **Tests:** snapshot tests of the Markdown renderer.
 
@@ -148,12 +149,21 @@ Status: `planned` · `in-progress` · `done`
   - `GET /documents/{ref}`
   - `GET /healthz`: liveness, ready immediately
   - `GET /readyz`: ready only after the index is built, the models have loaded and a warm-up has run
-- `mdrag serve [--port]` runs it on `node:http` and shuts down gracefully on SIGTERM. Logs go to stderr.
+- `md-rag serve [--port]` runs it on `node:http` and shuts down gracefully on SIGTERM. Logs go to stderr. The port comes only from `--port`, never from a `PORT` environment variable (ADR-032).
 - **Tests:** health and readiness transitions, a validation error, and a search round trip.
+
+### 19.1 Package distribution · `planned`
+
+- Ship everything as one npm package, `md-rag` (ADR-029). The `name` is already `md-rag`; remove `private`, add a `files` allowlist (`dist/`, `LICENSE`, `README.md`) and make sure runtime libraries are in `dependencies`.
+- `bin` maps `md-rag` to the CLI entry, which gets a `#!/usr/bin/env node` shebang. `exports` exposes the library entry from step 17 along with its types. Inside the repo both point at the `.ts` sources; pnpm's `publishConfig` points them at `dist/` for the published package.
+- `pnpm build` runs `tsc -p tsconfig.build.json`, which emits JS and `.d.ts` files into `dist/` using `rewriteRelativeImportExtensions`. It runs only from `prepack` (ADR-030). Add `dist/` to `.gitignore`.
+- In `CLAUDE.md`, add `pnpm build` to the commands table and note the pack-time emit in the tech stack.
+- Publishing is a manual `pnpm publish` by the maintainer. This step makes the package publishable; it doesn't automate releases.
+- **Tests:** a CI job runs `pnpm pack`, installs the tarball into an empty temporary directory and checks three things: `md-rag --help` runs, `md-rag check` passes on a copy of `examples/docs`, and a small TypeScript consumer that imports `createEngine` from `md-rag` type-checks. None of these download a model.
 
 ### 20. Agent setup doc · `planned`
 
-- `docs/agent-setup.md` gives ready-to-paste instructions (a `CLAUDE.md` snippet or skill) that teach an agent when and how to call `mdrag search` or `POST /search`. The style follows Grapevine's tool descriptions:
+- `docs/agent-setup.md` gives ready-to-paste instructions (a `CLAUDE.md` snippet or skill) that teach an agent when and how to call `md-rag search` (or `npx md-rag search` when it isn't installed) or `POST /search`. Every consumer of the package has the same interface, so the snippet doesn't need adapting per team (ADR-029). The style follows Grapevine's tool descriptions:
   - when to use `keyword` mode (identifiers, error codes) and when to use `hybrid` or `semantic`
   - 3–4 worked request examples, including filters and `expand`
   - the exact output format
@@ -165,16 +175,16 @@ Status: `planned` · `in-progress` · `done`
 
 ## Milestone 7: Validation
 
-### 21. `mdrag eval` with quality metrics · `planned`
+### 21. `md-rag eval` with quality metrics · `planned`
 
 - `examples/eval/queries.yaml` holds entries of the form `{ query, expected: [path or ref], filters? }`, covering each fixture case from step 3.
-- `mdrag eval` reports Recall@K, MRR and nDCG@N, with a per-query breakdown of misses. `--sidecars <dir>` lets you evaluate against an alternative sidecar set (e.g. a different chunk-size tuning, or a future chunker such as step 9's deferred LLM chunker).
+- `md-rag eval` reports Recall@K, MRR and nDCG@N, with a per-query breakdown of misses. `--sidecars <dir>` lets you evaluate against an alternative sidecar set (e.g. a different chunk-size tuning, or a future chunker such as step 9's deferred LLM chunker).
 - Include a query against the step 3.1 directory-style fixture whose answer lives in a different section/chunk than the one that best matches semantically. This checks whether retrieval at least surfaces the right *document* (recall at the doc level, not just the chunk level) — the follow-up step of using `getDocument`/`expand` to reach the specific fact is an agent behaviour, verified against `docs/agent-setup.md` (step 20), not a retrieval metric.
 - Ablation flags `--no-rerank` and `--mode <hybrid|keyword|semantic>` measure what each stage contributes (ADR-027).
 - `--save <file>` writes the metrics and per-query ranks as JSON. `--compare <file>` prints the differences against a saved run, both overall and per query (after Grapevine's `search-eval`).
 - **Tests:** metric functions checked against hand-computed worked examples.
 
-### 22. `mdrag eval --bench` · `planned`
+### 22. `md-rag eval --bench` · `planned`
 
 - Runs warm-up, then the query set repeated R times. Reports p50/p95/p99 for embed, search, rerank and total, and records the hardware (CPU model, core count). Record the results in `docs/benchmarks.md`.
 
@@ -188,5 +198,5 @@ Status: `planned` · `in-progress` · `done`
 
 ### 24. Integrator documentation · `planned`
 
-- `README.md` covers: what the project is, a quick start (`mdrag embed`, `mdrag check`, `mdrag search`, `mdrag serve`), the library API and the configuration reference.
-- `docs/contract.md` is the full frontmatter contract and sidecar format, written for exporter authors.
+- `README.md` covers: what the project is, a no-install quick start (`npx md-rag embed`, `check`, `search` and `serve` against a local directory), installing it (`pnpm add md-rag`) for the library API, and the configuration reference (the CLI flags and the matching `createEngine` options, ADR-032).
+- `docs/contract.md` is the full frontmatter contract, the `.md-rag/` layout and the sidecar format, written for exporter authors.
