@@ -86,7 +86,7 @@ Details and rejected options are in the [ADR log](#4-decision-log-adr).
 | Corpus ceiling | ~100k chunks (~700 MB RSS) | ~5 KB/chunk in RAM plus ~200 MB for runtime and models (A1) |
 | Startup | Seconds for ~10k docs | Hash checks and index inserts only; no chunking or embedding |
 | Freshness | Deployment restart time | There is no ingest lag inside the engine, because chunks and vectors ship with the content |
-| Privacy | The query path never leaves the process | The write path makes no LLM calls in the PoC; any future optional write-time LLM step uses a provider the integrator chooses (ADR-019) |
+| Privacy | Neither path leaves the process | No external services in the PoC, aside from downloading model weights into the cache (ADR-019, ADR-022) |
 
 ## 2. PoC Scope
 
@@ -201,7 +201,7 @@ Each record: **Decision**, then **Why**, then **Rejected** options. Superseded r
 
 **ADR-018 · Latency and quality numbers are measured targets, not claims.** *Why:* the original "< 30 ms" left out query embedding and underestimated the cost of the cross-encoder. *Rejected:* stating guarantees before benchmarking.
 
-**ADR-019 · Data boundary: the query path runs entirely in-process. By default the engine calls no external services. Optional write-time LLM steps use a model the integrator explicitly configures, such as a Claude API key through AI SDK or a local model, within the integrator's own trust boundary.** *Why:* this makes the privacy claim accurate while still allowing internal AI tooling. Deleting a file removes it from the index but not from Git history, and integrators handling PII need their own retention process. *Rejected:* "100% in-house"; "no LLM ever".
+**ADR-019 · Data boundary: neither the query path nor the write path calls an external service in the PoC.** *Why:* this makes the privacy claim unconditional rather than dependent on an optional feature. Deleting a file removes it from the index but not from Git history, and integrators handling PII need their own retention process. *Rejected:* "100% in-house" (network access for model downloads is still allowed, ADR-022).
 
 **ADR-020 · Toolchain: Node.js 24 LTS; TypeScript executed through native type stripping, with `tsc --noEmit` for type-checking; pnpm; Biome; Vitest.** *Why:* no build step, fast tools, and minimal configuration. *Rejected:* tsc emit or bundlers; ESLint plus Prettier; Bun (native ONNX bindings are less proven on it).
 

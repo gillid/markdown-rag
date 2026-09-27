@@ -35,10 +35,9 @@ Before reporting work as done, run `pnpm lint:fix`, `pnpm typecheck` and `pnpm t
 - **Every behaviour change is checked against its ADR.** If a change contradicts a decision in `docs/design.md` §4, update or supersede that ADR in the same PR.
 - **One step, one PR.** Work follows `docs/implementation.md`. Set the step's status (`planned` → `in-progress` → `done`) in the same PR.
 - **Sidecars are the contract between the write path and the read path.** A sidecar is fresh if and only if its `doc_hash` and embedding model match. Sidecar output must be byte-stable. Stale sidecars must fail fast and must never be patched over at runtime.
-- **The query path never makes network calls.** The only network access is downloading models into the cache and, at write time only, the optional LLM chunker.
-- **The LLM never rewrites content.** It only groups block IDs, its output is always validated, and the splitter is the fallback.
+- **Neither path makes network calls.** The only network access is downloading model weights into the cache.
 - **The library API is the extension point.** Advanced layers compose on `createEngine()`. Don't add plugin or hook systems.
-- **Tests use the `examples/docs` fixture and golden queries.** Expected values come from hand-written literals or worked examples. Model-dependent assertions go in `*.models.test.ts`. LLM behaviour is tested with AI SDK mock models only.
+- **Tests use the `examples/docs` fixture and golden queries.** Expected values come from hand-written literals or worked examples. Model-dependent assertions go in `*.models.test.ts`.
 - **Paths:** document identity uses POSIX paths relative to the knowledge base root. Line endings are normalised to LF before hashing.
 
 ## References
@@ -55,7 +54,7 @@ Before reporting work as done, run `pnpm lint:fix`, `pnpm typecheck` and `pnpm t
 | Runtime config | `src/config/` |
 | Storage loading and contract validation | `src/contract/` |
 | Sidecar format, freshness, `mdrag embed` | `src/sidecars/` |
-| Chunkers (structure-aware splitter, LLM) | `src/chunking/` |
+| Chunker (structure-aware splitter) | `src/chunking/` |
 | Embedder and reranker | `src/models/` |
 | Orama index and candidate search | `src/index/` |
 | Retrieval pipeline (rerank, recency, cutoff) | `src/retrieval/` |
@@ -64,7 +63,6 @@ Before reporting work as done, run `pnpm lint:fix`, `pnpm typecheck` and `pnpm t
 | Eval and benchmarks | `src/eval/` |
 | Orama docs | https://docs.orama.com |
 | transformers.js docs | https://huggingface.co/docs/transformers.js |
-| AI SDK docs | https://ai-sdk.dev/docs |
 
 ## Keeping Docs Current
 
