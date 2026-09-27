@@ -15,7 +15,7 @@ Follow these steps in order.
 3. **Sync with `main` and branch.**
    - Check `git status` first; if there are uncommitted changes that aren't part of this step, stop and ask the user.
    - `git checkout main`, `git pull --ff-only origin main` (or the configured remote).
-   - Create a new branch off `main` named for the step, e.g. `feat/05-kb-loader` or `chore/03-sample-kb` — match the prefix to the step's nature (`feat`, `chore`, `docs`, etc.) per `CLAUDE.md`'s conventional-commit scopes.
+   - Create a new branch off `main` named for the step, e.g. `feat/05-storage-loader` or `chore/03-sample-knowledge-base` — match the prefix to the step's nature (`feat`, `chore`, `docs`, etc.) per `CLAUDE.md`'s conventional-commit scopes.
 
 4. **Read the relevant ADRs.** Skim `docs/design.md` §4 (ADR log) for any ADR referenced by the step's bullet points, so the implementation doesn't contradict a recorded decision.
 

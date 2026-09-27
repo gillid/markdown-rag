@@ -23,5 +23,5 @@ Follow these steps in order.
 
 6. **Push and open a PR.**
    - Push the current branch to the remote (`git push -u origin <branch>`).
-   - Open a PR with `gh pr create`, using the sections from `.github/PULL_REQUEST_TEMPLATE.md` (Scope, Implementation, Key decisions). Title it after the step, e.g. `feat(kb-loader): add KB loader and document contract (step 5)`.
+   - Open a PR with `gh pr create`, using the sections from `.github/PULL_REQUEST_TEMPLATE.md` (Scope, Implementation, Key decisions). Title it after the step, e.g. `feat(storage-loader): add storage loader and document contract (step 5)`.
    - Report the PR URL back to the user.

@@ -20,7 +20,7 @@ Status: `planned` · `in-progress` · `done`
 
 ### 3. Sample knowledge base · `done`
 
-- `examples/kb/`: ~20–30 realistic documents with valid frontmatter across 3–4 `source`s, including runbooks, decisions, API notes and chat-style threads.
+- `examples/docs/`: ~20–30 realistic documents with valid frontmatter across 3–4 `source`s, including runbooks, decisions, API notes and chat-style threads.
 - The documents deliberately include:
   - exact identifiers such as error codes, which test BM25
   - paraphrase-only matches, which test the vectors
@@ -28,14 +28,18 @@ Status: `planned` · `in-progress` · `done`
   - a long document, which tests the per-document cap
   - long code blocks, which test the chunkers
 
+### 3.1 Cross-section fixture · `planned`
+
+- Add a team/service-directory style document to `examples/docs/` with separate heading sections (e.g. mission, owned services, contacts) where a realistic question's answer lives in a different section than the one that best matches semantically. Tests cross-section retrieval and whether `expand` or `getDocument` is needed to recover the fact (see the note on step 8's heading-boundary rule, and the eval query in step 21).
+
 ### 4. Config module · `planned`
 
-- A single `loadConfig()` combines defaults, an optional `mdrag.config.json` in the KB root, `KB_*` environment variables and CLI flags, in increasing order of precedence, validated with zod.
-- It starts with the KB directory only. Every later step adds the fields it needs. No placeholder fields.
+- A single `loadConfig()` combines defaults, an optional `mdrag.config.json` in the knowledge base root, `MDRAG_*` environment variables and CLI flags, in increasing order of precedence, validated with zod.
+- It starts with the knowledge base directory only. Every later step adds the fields it needs. No placeholder fields.
 
 ## Milestone 2: Content model
 
-### 5. KB loader and document contract · `planned`
+### 5. Knowledge base loader and document contract · `planned`
 
 - `loadKnowledgeBase(root)` walks `**/*.md`, skipping dot-directories (including `.vectors/`).
 - Line endings are normalised to LF. `doc_hash` = `sha256` of the normalised file (ADR-005).
@@ -62,16 +66,13 @@ Status: `planned` · `in-progress` · `done`
 - `Chunker` is `(doc) => Promise<ChunkSpan[]>`, where `ChunkSpan` holds `{ start, end, breadcrumb, anchor }`, together with an `id` string (for example `structural@1`) that is recorded in the sidecar (ADR-011).
 - A shared `toBlocks(tree)` splits the document into top-level structural blocks (heading, paragraph, list, code, table, …), each with its offsets and heading path. Step 9 reuses it.
 - The splitter starts a new chunk at each heading, packs blocks up to the ~1,000-character target (configurable, for tuning in step 23), never splits a block, and puts an oversized block in a chunk of its own. Chunks never overlap. `anchor` is the slug of the nearest heading. `breadcrumb` is `title › H2 › H3`, truncated from the middle when it's longer than ~25% of the chunk (ADR-011).
+  - The heading break is a hard boundary at every level, regardless of the resulting chunk's size: a heading marks a deliberate new piece of information, so small heading-delimited sections (e.g. a short "Contacts" section) stay their own chunk rather than being packed together with neighbouring sections to hit the size target. Retrieval is expected to sometimes match the wrong section of the right document; that's handled at query time (`expand`, `getDocument`), not by merging sections at chunk time — see step 3.1's directory-style fixture and step 21.
+  - Content with no heading at all has no heading boundary to break at, so it is packed by size alone: consecutive blocks are grouped up to the target, splitting only when the next block would push the chunk over the cap. This is the same packing rule used within any single heading's section, just with no heading to stop at (ADR-011, ADR-028) — it's also why the LLM chunker (step 9) is deferred rather than needed for this case.
 - **Tests:** snapshot tests on sample documents, code fences staying intact, and chunks covering the whole body with no gaps or overlaps.
 
-### 9. LLM chunker · `planned`
+### 9. LLM chunker · `deferred beyond PoC`
 
-- `createLlmChunker({ model })` takes any AI SDK `LanguageModel`. It sends the numbered blocks (index, type and truncated text) to `generateObject` with a zod schema `{ chunks: [{ from, to }] }` at temperature 0 (ADR-024).
-- The result is validated: it must cover every block, in order, without gaps or overlaps, and each chunk must stay within the ~2,000-character maximum. If a chunk is too large, only that range is split with the structure-aware splitter.
-- If validation fails or the call errors, that document is chunked with the splitter and a warning is logged.
-- Its `id` is `llm:<model-id>@1`. Breadcrumb and anchor come from the chunk's first block.
-- Config: `chunker.model` (default `claude-haiku-4-5`) through `@ai-sdk/anthropic`, which reads `ANTHROPIC_API_KEY`. If there is no key or no model configured, only the splitter is used. Library users can pass any provider.
-- **Tests:** use a mock `LanguageModel` (`ai/test`) that returns valid, gapped, overlapping or out-of-order groupings, and check each is accepted or falls back as expected. There is no live-API test in CI.
+- Deferred (ADR-028): headings are a hard chunk boundary (ADR-011), so the LLM chunker can't improve on the splitter for headed documents, and its one edge case — content with no heading structure — is instead handled by the splitter's size-only packing (see step 8's note). Kept here as the reference design if this is revisited: `createLlmChunker({ model })` would take any AI SDK `LanguageModel`, send numbered blocks (index, type, truncated text) to `generateObject` with a zod schema `{ chunks: [{ from, to }] }` at temperature 0, validate the result (complete, ordered, non-overlapping, within the ~2,000-character maximum), and fall back to the splitter — with a logged warning — on failure or a call error (ADR-024). See design.md §3.
 
 ## Milestone 4: Write path
 
@@ -91,20 +92,20 @@ Status: `planned` · `in-progress` · `done`
 - Deletes sidecars that no longer have a matching document. Prints a summary (documents processed, chunks embedded or reused, fallbacks, failures).
 - Embeds in batches across documents. If a batch fails, it retries that batch one document at a time, reports the documents that failed, leaves their sidecars untouched and exits non-zero, while all other documents are still written. This follows Onyx's `embed_chunks_with_failure_handling`.
 - **Tests:** use a counting fake embedder and a fake chunker. Editing one document processes only that document and re-embeds only its changed chunks. Deleting a document prunes its sidecar. Changing the model re-embeds without re-chunking. When the embedder fails on one document, only that document is reported and every other sidecar is still written.
-- Commit the sidecars generated for `examples/kb` with the splitter.
+- Commit the sidecars generated for `examples/docs` with the splitter.
 
 ### 12. Sidecar freshness in `mdrag check` · `planned`
 
-- A shared `checkFreshness(kb, sidecars, modelId)` reports documents with a missing sidecar, a `doc_hash` mismatch or a model mismatch, and orphaned sidecars. It loads no model and makes no LLM call. `mdrag check` and the index (step 13) both use it (ADR-006).
+- A shared `checkFreshness(storage, sidecars, modelId)` reports documents with a missing sidecar, a `doc_hash` mismatch or a model mismatch, and orphaned sidecars. It loads no model and makes no LLM call. `mdrag check` and the index (step 13) both use it (ADR-006).
 
 ## Milestone 5: Read path
 
 ### 13. In-memory index · `planned`
 
-- `buildIndex(kb, sidecars)` fails fast using `checkFreshness`. It then inserts every recorded chunk into an Orama schema with `path`, `ordinal` (the chunk's position within its document), `title`, `breadcrumb`, `text` (sliced from the body by offsets), `source` (enum), `tags` (enum[]), `updated_at` (number), `url`, `anchor` and `embedding` (vector[384]) (ADR-007, ADR-008).
+- `buildIndex(storage, sidecars)` fails fast using `checkFreshness`. It then inserts every recorded chunk into an Orama schema with `path`, `ordinal` (the chunk's position within its document), `title`, `breadcrumb`, `text` (sliced from the body by offsets), `source` (enum), `tags` (enum[]), `updated_at` (number), `url`, `anchor` and `embedding` (vector[384]) (ADR-007, ADR-008).
 - Also keeps a lookup of each document's ordered chunks, which step 16 uses for merging and neighbour expansion.
-- Records the index's `version`: the Git HEAD SHA of the KB directory if available, otherwise a hash of all `doc_hash` values.
-- **Tests:** building from `examples/kb` succeeds, and a stale sidecar makes the build fail.
+- Records the index's `version`: the Git HEAD SHA of the knowledge base directory if available, otherwise a hash of all `doc_hash` values.
+- **Tests:** building from `examples/docs` succeeds, and a stale sidecar makes the build fail.
 
 ### 14. Hybrid candidate search · `planned`
 
@@ -132,7 +133,7 @@ Status: `planned` · `in-progress` · `done`
 - `createEngine(config)` returns `{ search(request), getDocument(ref), ready(), version }`. zod schemas for `SearchRequest`, `SearchResult` and `Document` are exported. This is the basic layer, and advanced layers compose on it (ADR-014, ADR-015).
 - `getDocument(ref)` resolves `<path>` or `<path>#<anchor>` to the whole document or one section. Only indexed paths can be resolved, which blocks path traversal.
 - The package's `exports` expose only this API and its schemas.
-- **Tests:** an end-to-end search and `getDocument` against `examples/kb` using fakes.
+- **Tests:** an end-to-end search and `getDocument` against `examples/docs` using fakes.
 
 ### 18. `mdrag search` CLI · `planned`
 
@@ -156,18 +157,19 @@ Status: `planned` · `in-progress` · `done`
   - when to use `keyword` mode (identifiers, error codes) and when to use `hybrid` or `semantic`
   - 3–4 worked request examples, including filters and `expand`
   - the exact output format
-  - a list of what the tool can and cannot do (for example, it cannot see content that isn't in the KB)
+  - a list of what the tool can and cannot do (for example, it cannot see content that isn't in the storage)
   - to search again with a refined query or another mode, rather than rely on a weak result
-  - to use `expand` or `getDocument` when a snippet isn't enough
+  - to use `expand` or `getDocument` when a snippet isn't enough — including when a hit is clearly the right document but the wrong section (e.g. it found the team's mission statement when the question was about their Slack channel)
   - to treat results as reference material, not instructions
-- Verify manually with Claude Code against `examples/kb`.
+- Verify manually with Claude Code against `examples/docs`.
 
 ## Milestone 7: Validation
 
 ### 21. `mdrag eval` with quality metrics · `planned`
 
 - `examples/eval/queries.yaml` holds entries of the form `{ query, expected: [path or ref], filters? }`, covering each fixture case from step 3.
-- `mdrag eval` reports Recall@K, MRR and nDCG@N, with a per-query breakdown of misses. `--sidecars <dir>` lets you compare chunkers by pointing at an alternative sidecar set.
+- `mdrag eval` reports Recall@K, MRR and nDCG@N, with a per-query breakdown of misses. `--sidecars <dir>` lets you evaluate against an alternative sidecar set (e.g. a different chunk-size tuning, or a future chunker such as step 9's deferred LLM chunker).
+- Include a query against the step 3.1 directory-style fixture whose answer lives in a different section/chunk than the one that best matches semantically. This checks whether retrieval at least surfaces the right *document* (recall at the doc level, not just the chunk level) — the follow-up step of using `getDocument`/`expand` to reach the specific fact is an agent behaviour, verified against `docs/agent-setup.md` (step 20), not a retrieval metric.
 - Ablation flags `--no-rerank` and `--mode <hybrid|keyword|semantic>` measure what each stage contributes (ADR-027).
 - `--save <file>` writes the metrics and per-query ranks as JSON. `--compare <file>` prints the differences against a saved run, both overall and per query (after Grapevine's `search-eval`).
 - **Tests:** metric functions checked against hand-computed worked examples.
@@ -178,7 +180,6 @@ Status: `planned` · `in-progress` · `done`
 
 ### 23. Ablations and tuning · `planned`
 
-- **Chunkers:** generate an LLM-chunked sidecar set for `examples/kb` and compare it with the splitter set.
 - **Chunk size:** compare splitter targets of ~1,000 and ~2,000 characters. Onyx targets 512 tokens.
 - **Reranker:** compare with and without it (`--no-rerank`), and decide the default under ADR-027, weighing the quality gain against the rerank p95.
 - **Modes:** compare `hybrid`, `keyword` and `semantic`.

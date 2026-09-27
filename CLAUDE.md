@@ -8,7 +8,6 @@ An open-source engine that serves a Git repository of Markdown files to AI agent
 - **Package manager:** pnpm
 - **Search:** `@orama/orama` (in-process hybrid index)
 - **Query-path models (local):** `@huggingface/transformers` on `onnxruntime-node`. The embedder is `Xenova/bge-small-en-v1.5` and the reranker is `Xenova/ms-marco-MiniLM-L-6-v2` (q8).
-- **Write-time LLM chunking (optional):** `ai` (AI SDK) with `@ai-sdk/anthropic`. The default model is `claude-haiku-4-5`, and the key is read from `ANTHROPIC_API_KEY`.
 - **Parsing and validation:** `mdast-util-from-markdown`, `mdast-util-frontmatter`, `yaml`, `zod`
 - **HTTP:** `node:http`, with no framework
 - **Tooling:** Biome (lint and format), Vitest (tests), Lefthook (git hooks)
@@ -21,7 +20,7 @@ Keep this list in sync with `package.json`.
 | --- | --- |
 | `pnpm install` | Install dependencies |
 | `pnpm mdrag <cmd>` | Run the CLI: `embed`, `check`, `search`, `serve`, `eval` |
-| `pnpm start` | `mdrag serve` (HTTP API) with the configured KB |
+| `pnpm start` | `mdrag serve` (HTTP API) with the configured storage |
 | `pnpm lint` / `pnpm lint:fix` | Biome check / apply fixes and formatting |
 | `pnpm typecheck` | `tsc --noEmit` |
 | `pnpm test` | Unit tests; no model downloads and no LLM calls |
@@ -36,11 +35,10 @@ Before reporting work as done, run `pnpm lint:fix`, `pnpm typecheck` and `pnpm t
 - **Every behaviour change is checked against its ADR.** If a change contradicts a decision in `docs/design.md` §4, update or supersede that ADR in the same PR.
 - **One step, one PR.** Work follows `docs/implementation.md`. Set the step's status (`planned` → `in-progress` → `done`) in the same PR.
 - **Sidecars are the contract between the write path and the read path.** A sidecar is fresh if and only if its `doc_hash` and embedding model match. Sidecar output must be byte-stable. Stale sidecars must fail fast and must never be patched over at runtime.
-- **The query path never makes network calls.** The only network access is downloading models into the cache and, at write time only, the optional LLM chunker.
-- **The LLM never rewrites content.** It only groups block IDs, its output is always validated, and the splitter is the fallback.
+- **Neither path makes network calls.** The only network access is downloading model weights into the cache.
 - **The library API is the extension point.** Advanced layers compose on `createEngine()`. Don't add plugin or hook systems.
-- **Tests use the `examples/kb` fixture and golden queries.** Expected values come from hand-written literals or worked examples. Model-dependent assertions go in `*.models.test.ts`. LLM behaviour is tested with AI SDK mock models only.
-- **Paths:** document identity uses POSIX paths relative to the KB root. Line endings are normalised to LF before hashing.
+- **Tests use the `examples/docs` fixture and golden queries.** Expected values come from hand-written literals or worked examples. Model-dependent assertions go in `*.models.test.ts`.
+- **Paths:** document identity uses POSIX paths relative to the knowledge base root. Line endings are normalised to LF before hashing.
 
 ## References
 
@@ -51,12 +49,12 @@ Before reporting work as done, run `pnpm lint:fix`, `pnpm typecheck` and `pnpm t
 | Document contract and sidecar format (for exporters) | `docs/contract.md` (planned, step 24) |
 | Agent setup prompt | `docs/agent-setup.md` (planned, step 20) |
 | Benchmark and chunker comparison | `docs/benchmarks.md` (planned, steps 22–23) |
-| Sample KB and golden queries | `examples/kb/`, `examples/eval/` (planned, steps 3, 21) |
+| Sample knowledge base and golden queries | `examples/docs/`, `examples/eval/` (planned, steps 3, 21) |
 | CLI entry and subcommands | `src/cli/` |
 | Runtime config | `src/config/` |
-| KB loading and contract validation | `src/contract/` |
+| Storage loading and contract validation | `src/contract/` |
 | Sidecar format, freshness, `mdrag embed` | `src/sidecars/` |
-| Chunkers (structure-aware splitter, LLM) | `src/chunking/` |
+| Chunker (structure-aware splitter) | `src/chunking/` |
 | Embedder and reranker | `src/models/` |
 | Orama index and candidate search | `src/index/` |
 | Retrieval pipeline (rerank, recency, cutoff) | `src/retrieval/` |
@@ -65,7 +63,6 @@ Before reporting work as done, run `pnpm lint:fix`, `pnpm typecheck` and `pnpm t
 | Eval and benchmarks | `src/eval/` |
 | Orama docs | https://docs.orama.com |
 | transformers.js docs | https://huggingface.co/docs/transformers.js |
-| AI SDK docs | https://ai-sdk.dev/docs |
 
 ## Keeping Docs Current
 
