@@ -11,7 +11,7 @@ Status: `planned` · `in-progress` · `done`
 - pnpm project, Node 24 (`engines`, `.nvmrc`), `"type": "module"`, MIT `LICENSE` (ADR-020, ADR-021).
 - `tsconfig.json` set up for type stripping: `noEmit`, `erasableSyntaxOnly`, `allowImportingTsExtensions`, `verbatimModuleSyntax`, `strict`.
 - Biome, Vitest, and the scripts listed in `CLAUDE.md`. Model-backed tests (`*.models.test.ts`) are excluded from `pnpm test`.
-- A `mdrag` script (`pnpm mdrag <cmd>`) backed by `src/cli/main.ts`, which dispatches subcommands with `node:util` `parseArgs`. At this stage `pnpm mdrag --help` is the only command.
+- An `md-rag` script (`pnpm md-rag <cmd>`) backed by `src/cli/main.ts`, which dispatches subcommands with `node:util` `parseArgs`. At this stage `pnpm md-rag --help` is the only command.
 - **Done when:** `pnpm lint`, `pnpm typecheck` and `pnpm test` pass on a smoke test.
 
 ### 2. Project CI · `done`

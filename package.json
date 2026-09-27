@@ -11,7 +11,7 @@
   },
   "scripts": {
     "prepare": "lefthook install",
-    "mdrag": "node src/cli/main.ts",
+    "md-rag": "node src/cli/main.ts",
     "start": "node src/cli/main.ts serve",
     "lint": "biome check .",
     "lint:fix": "biome check --write .",

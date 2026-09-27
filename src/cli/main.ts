@@ -1,7 +1,7 @@
 import { pathToFileURL } from "node:url";
 import { parseArgs } from "node:util";
 
-export const HELP = `Usage: mdrag <command> [options]
+export const HELP = `Usage: md-rag <command> [options]
 
 Commands:
   (none yet)
