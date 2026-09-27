@@ -67,16 +67,12 @@ Status: `planned` · `in-progress` · `done`
 - A shared `toBlocks(tree)` splits the document into top-level structural blocks (heading, paragraph, list, code, table, …), each with its offsets and heading path. Step 9 reuses it.
 - The splitter starts a new chunk at each heading, packs blocks up to the ~1,000-character target (configurable, for tuning in step 23), never splits a block, and puts an oversized block in a chunk of its own. Chunks never overlap. `anchor` is the slug of the nearest heading. `breadcrumb` is `title › H2 › H3`, truncated from the middle when it's longer than ~25% of the chunk (ADR-011).
   - The heading break is a hard boundary at every level, regardless of the resulting chunk's size: a heading marks a deliberate new piece of information, so small heading-delimited sections (e.g. a short "Contacts" section) stay their own chunk rather than being packed together with neighbouring sections to hit the size target. Retrieval is expected to sometimes match the wrong section of the right document; that's handled at query time (`expand`, `getDocument`), not by merging sections at chunk time — see step 3.1's directory-style fixture and step 21.
+  - Content with no heading at all has no heading boundary to break at, so it is packed by size alone: consecutive blocks are grouped up to the target, splitting only when the next block would push the chunk over the cap. This is the same packing rule used within any single heading's section, just with no heading to stop at (ADR-011, ADR-028) — it's also why the LLM chunker (step 9) is deferred rather than needed for this case.
 - **Tests:** snapshot tests on sample documents, code fences staying intact, and chunks covering the whole body with no gaps or overlaps.
 
-### 9. LLM chunker · `planned`
+### 9. LLM chunker · `deferred beyond PoC`
 
-- `createLlmChunker({ model })` takes any AI SDK `LanguageModel`. It sends the numbered blocks (index, type and truncated text) to `generateObject` with a zod schema `{ chunks: [{ from, to }] }` at temperature 0 (ADR-024).
-- The result is validated: it must cover every block, in order, without gaps or overlaps, and each chunk must stay within the ~2,000-character maximum. If a chunk is too large, only that range is split with the structure-aware splitter.
-- If validation fails or the call errors, that document is chunked with the splitter and a warning is logged.
-- Its `id` is `llm:<model-id>@1`. Breadcrumb and anchor come from the chunk's first block.
-- Config: `chunker.model` (default `claude-haiku-4-5`) through `@ai-sdk/anthropic`, which reads `ANTHROPIC_API_KEY`. If there is no key or no model configured, only the splitter is used. Library users can pass any provider.
-- **Tests:** use a mock `LanguageModel` (`ai/test`) that returns valid, gapped, overlapping or out-of-order groupings, and check each is accepted or falls back as expected. There is no live-API test in CI.
+- Deferred (ADR-028): headings are a hard chunk boundary (ADR-011), so the LLM chunker can't improve on the splitter for headed documents, and its one edge case — content with no heading structure — is instead handled by the splitter's size-only packing (see step 8's note). Kept here as the reference design if this is revisited: `createLlmChunker({ model })` would take any AI SDK `LanguageModel`, send numbered blocks (index, type, truncated text) to `generateObject` with a zod schema `{ chunks: [{ from, to }] }` at temperature 0, validate the result (complete, ordered, non-overlapping, within the ~2,000-character maximum), and fall back to the splitter — with a logged warning — on failure or a call error (ADR-024). See design.md §3.
 
 ## Milestone 4: Write path
 
@@ -172,7 +168,7 @@ Status: `planned` · `in-progress` · `done`
 ### 21. `mdrag eval` with quality metrics · `planned`
 
 - `examples/eval/queries.yaml` holds entries of the form `{ query, expected: [path or ref], filters? }`, covering each fixture case from step 3.
-- `mdrag eval` reports Recall@K, MRR and nDCG@N, with a per-query breakdown of misses. `--sidecars <dir>` lets you compare chunkers by pointing at an alternative sidecar set.
+- `mdrag eval` reports Recall@K, MRR and nDCG@N, with a per-query breakdown of misses. `--sidecars <dir>` lets you evaluate against an alternative sidecar set (e.g. a different chunk-size tuning, or a future chunker such as step 9's deferred LLM chunker).
 - Include a query against the step 3.1 directory-style fixture whose answer lives in a different section/chunk than the one that best matches semantically. This checks whether retrieval at least surfaces the right *document* (recall at the doc level, not just the chunk level) — the follow-up step of using `getDocument`/`expand` to reach the specific fact is an agent behaviour, verified against `docs/agent-setup.md` (step 20), not a retrieval metric.
 - Ablation flags `--no-rerank` and `--mode <hybrid|keyword|semantic>` measure what each stage contributes (ADR-027).
 - `--save <file>` writes the metrics and per-query ranks as JSON. `--compare <file>` prints the differences against a saved run, both overall and per query (after Grapevine's `search-eval`).
@@ -184,7 +180,6 @@ Status: `planned` · `in-progress` · `done`
 
 ### 23. Ablations and tuning · `planned`
 
-- **Chunkers:** generate an LLM-chunked sidecar set for `examples/kb` and compare it with the splitter set.
 - **Chunk size:** compare splitter targets of ~1,000 and ~2,000 characters. Onyx targets 512 tokens.
 - **Reranker:** compare with and without it (`--no-rerank`), and decide the default under ADR-027, weighing the quality gain against the rerank p95.
 - **Modes:** compare `hybrid`, `keyword` and `semantic`.

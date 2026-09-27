@@ -8,7 +8,6 @@ An open-source engine that serves a Git repository of Markdown files to AI agent
 - **Package manager:** pnpm
 - **Search:** `@orama/orama` (in-process hybrid index)
 - **Query-path models (local):** `@huggingface/transformers` on `onnxruntime-node`. The embedder is `Xenova/bge-small-en-v1.5` and the reranker is `Xenova/ms-marco-MiniLM-L-6-v2` (q8).
-- **Write-time LLM chunking (optional):** `ai` (AI SDK) with `@ai-sdk/anthropic`. The default model is `claude-haiku-4-5`, and the key is read from `ANTHROPIC_API_KEY`.
 - **Parsing and validation:** `mdast-util-from-markdown`, `mdast-util-frontmatter`, `yaml`, `zod`
 - **HTTP:** `node:http`, with no framework
 - **Tooling:** Biome (lint and format), Vitest (tests), Lefthook (git hooks)
