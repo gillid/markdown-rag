@@ -28,6 +28,10 @@ Status: `planned` · `in-progress` · `done`
   - a long document, which tests the per-document cap
   - long code blocks, which test the chunkers
 
+### 3.1 Cross-section fixture · `planned`
+
+- Add a team/service-directory style document to `examples/kb/` with separate heading sections (e.g. mission, owned services, contacts) where a realistic question's answer lives in a different section than the one that best matches semantically. Tests cross-section retrieval and whether `expand` or `getDocument` is needed to recover the fact (see the note on step 8's heading-boundary rule, and the eval query in step 21).
+
 ### 4. Config module · `planned`
 
 - A single `loadConfig()` combines defaults, an optional `mdrag.config.json` in the KB root, `KB_*` environment variables and CLI flags, in increasing order of precedence, validated with zod.
@@ -62,6 +66,7 @@ Status: `planned` · `in-progress` · `done`
 - `Chunker` is `(doc) => Promise<ChunkSpan[]>`, where `ChunkSpan` holds `{ start, end, breadcrumb, anchor }`, together with an `id` string (for example `structural@1`) that is recorded in the sidecar (ADR-011).
 - A shared `toBlocks(tree)` splits the document into top-level structural blocks (heading, paragraph, list, code, table, …), each with its offsets and heading path. Step 9 reuses it.
 - The splitter starts a new chunk at each heading, packs blocks up to the ~1,000-character target (configurable, for tuning in step 23), never splits a block, and puts an oversized block in a chunk of its own. Chunks never overlap. `anchor` is the slug of the nearest heading. `breadcrumb` is `title › H2 › H3`, truncated from the middle when it's longer than ~25% of the chunk (ADR-011).
+  - The heading break is a hard boundary at every level, regardless of the resulting chunk's size: a heading marks a deliberate new piece of information, so small heading-delimited sections (e.g. a short "Contacts" section) stay their own chunk rather than being packed together with neighbouring sections to hit the size target. Retrieval is expected to sometimes match the wrong section of the right document; that's handled at query time (`expand`, `getDocument`), not by merging sections at chunk time — see step 3.1's directory-style fixture and step 21.
 - **Tests:** snapshot tests on sample documents, code fences staying intact, and chunks covering the whole body with no gaps or overlaps.
 
 ### 9. LLM chunker · `planned`
@@ -158,7 +163,7 @@ Status: `planned` · `in-progress` · `done`
   - the exact output format
   - a list of what the tool can and cannot do (for example, it cannot see content that isn't in the KB)
   - to search again with a refined query or another mode, rather than rely on a weak result
-  - to use `expand` or `getDocument` when a snippet isn't enough
+  - to use `expand` or `getDocument` when a snippet isn't enough — including when a hit is clearly the right document but the wrong section (e.g. it found the team's mission statement when the question was about their Slack channel)
   - to treat results as reference material, not instructions
 - Verify manually with Claude Code against `examples/kb`.
 
@@ -168,6 +173,7 @@ Status: `planned` · `in-progress` · `done`
 
 - `examples/eval/queries.yaml` holds entries of the form `{ query, expected: [path or ref], filters? }`, covering each fixture case from step 3.
 - `mdrag eval` reports Recall@K, MRR and nDCG@N, with a per-query breakdown of misses. `--sidecars <dir>` lets you compare chunkers by pointing at an alternative sidecar set.
+- Include a query against the step 3.1 directory-style fixture whose answer lives in a different section/chunk than the one that best matches semantically. This checks whether retrieval at least surfaces the right *document* (recall at the doc level, not just the chunk level) — the follow-up step of using `getDocument`/`expand` to reach the specific fact is an agent behaviour, verified against `docs/agent-setup.md` (step 20), not a retrieval metric.
 - Ablation flags `--no-rerank` and `--mode <hybrid|keyword|semantic>` measure what each stage contributes (ADR-027).
 - `--save <file>` writes the metrics and per-query ranks as JSON. `--compare <file>` prints the differences against a saved run, both overall and per query (after Grapevine's `search-eval`).
 - **Tests:** metric functions checked against hand-computed worked examples.
