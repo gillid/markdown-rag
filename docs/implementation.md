@@ -80,6 +80,7 @@ Status: `planned` · `in-progress` · `done`
 
 - An `Embedder` interface (`embedDocuments`, `embedQuery`, `modelId`, `dims`) and a transformers.js implementation: `feature-extraction` with mean pooling and normalisation, q8 weights, and a pinned model revision (ADR-009, ADR-010).
 - Config covers the model cache directory (`modelsDir`, default `<root>/.md-rag/models/`, overridable with `--models-dir`) and whether remote models are allowed (ADR-022, ADR-031). Both are passed to transformers.js explicitly, never through environment variables (ADR-032). The model loads lazily, once. The BGE query instruction prefix is applied only to queries.
+- Model presets map a model ID (the value recorded in sidecars) to its Hugging Face repository, pinned revision, dimensions and query prefix. The PoC has one embedding preset, `bge-small-en-v1.5` (ADR-010).
 - A shared `ensureEngineDir(root)` creates `.md-rag/` and writes `.md-rag/.gitignore` (ignoring `models/`) with its canonical content, overwriting any edits, since nothing in `.md-rag/` is hand-edited (ADR-031). Model loading calls it before anything is downloaded into the default cache, and step 11 reuses it.
 - **Tests:** a `*.models.test.ts` checks that a paraphrase pair outscores an unrelated pair, and that vectors have 384 dimensions and are L2-normalised.
 
@@ -90,20 +91,20 @@ Status: `planned` · `in-progress` · `done`
   - reuse vectors from the old sidecar where a chunk hash matches, and embed the rest
   - write the sidecar to `.md-rag/vectors/`, creating the folder through `ensureEngineDir` on first run (ADR-031)
 - The model defaults to the one the existing sidecars record, and to the built-in default for a fresh knowledge base. Only an explicit `--model` switches it; `embed` then re-embeds the chunks already recorded, without re-chunking. If the sidecars record more than one model (for example, after an interrupted switch), `embed` without `--model` exits with an error asking for one (ADR-032). A chunker change alone invalidates nothing (ADR-024).
-- Deletes sidecars that no longer have a matching document. Prints a summary (documents processed, chunks embedded or reused, fallbacks, failures).
+- Deletes sidecars that no longer have a matching document. Prints a summary (documents processed, chunks embedded or reused, failures).
 - Embeds in batches across documents. If a batch fails, it retries that batch one document at a time, reports the documents that failed, leaves their sidecars untouched and exits non-zero, while all other documents are still written. This follows Onyx's `embed_chunks_with_failure_handling`.
 - **Tests:** use a counting fake embedder and a fake chunker. Editing one document processes only that document and re-embeds only its changed chunks. Deleting a document prunes its sidecar. Without `--model`, a knowledge base embedded with a non-default model keeps that model; `--model` re-embeds without re-chunking. When the embedder fails on one document, only that document is reported and every other sidecar is still written. The first run on a fresh knowledge base creates `.md-rag/.gitignore`, and an edited one is restored to its canonical content.
 - Commit `examples/docs/.md-rag/` (the sidecars generated with the splitter, plus its `.gitignore`).
 
 ### 12. Sidecar freshness in `md-rag check` · `planned`
 
-- A shared `checkFreshness(storage, sidecars)` reports documents with a missing sidecar or a `doc_hash` mismatch, orphaned sidecars, and sidecars whose recorded model differs from the rest. On success it returns the one model ID they share, which the read path loads (ADR-006, ADR-032). A model ID the engine has no preset for is also an error. It loads no model and makes no LLM call. `md-rag check` and the index (step 13) both use it (ADR-006). When `.md-rag/vectors/` doesn't exist yet, the error says to run `md-rag embed` first (ADR-031).
+- A shared `checkFreshness(storage, sidecars)` reports documents with a missing sidecar or a `doc_hash` mismatch, orphaned sidecars, and sidecars whose recorded model differs from the rest. On success it returns the one model ID they share, which the read path loads (ADR-006, ADR-032). A model ID the engine has no preset for (step 10) is also an error. It loads no model and makes no LLM call. `md-rag check` and the index (step 13) both use it. When `.md-rag/vectors/` doesn't exist yet, the error says to run `md-rag embed` first (ADR-031).
 
 ## Milestone 5: Read path
 
 ### 13. In-memory index · `planned`
 
-- `buildIndex(storage, sidecars)` fails fast using `checkFreshness`. It then inserts every recorded chunk into an Orama schema with `path`, `ordinal` (the chunk's position within its document), `title`, `breadcrumb`, `text` (sliced from the body by offsets), `source` (enum), `tags` (enum[]), `updated_at` (number), `url`, `anchor` and `embedding` (vector[384]) (ADR-007, ADR-008).
+- `buildIndex(storage, sidecars)` fails fast using `checkFreshness`. It then inserts every recorded chunk into an Orama schema with `path`, `ordinal` (the chunk's position within its document), `title`, `breadcrumb`, `text` (sliced from the body by offsets), `source` (enum), `tags` (enum[]), `updated_at` (number), `url`, `anchor` and `embedding` (a vector sized to the shared model's `dims`, 384 for the default) (ADR-007, ADR-008).
 - Also keeps a lookup of each document's ordered chunks, which step 16 uses for merging and neighbour expansion.
 - Records the index's `version`: the Git HEAD SHA of the knowledge base directory if available, otherwise a hash of all `doc_hash` values.
 - **Tests:** building from `examples/docs` succeeds, and a stale sidecar makes the build fail.
@@ -156,7 +157,7 @@ Status: `planned` · `in-progress` · `done`
 
 - Ship everything as one npm package, `md-rag` (ADR-029). The `name` is already `md-rag`; remove `private`, add a `files` allowlist (`dist/`, `LICENSE`, `README.md`) and make sure runtime libraries are in `dependencies`.
 - `bin` maps `md-rag` to the CLI entry, which gets a `#!/usr/bin/env node` shebang. `exports` exposes the library entry from step 17 along with its types. Inside the repo both point at the `.ts` sources; pnpm's `publishConfig` points them at `dist/` for the published package.
-- `pnpm build` runs `tsc -p tsconfig.build.json`, which emits JS and `.d.ts` files into `dist/` using `rewriteRelativeImportExtensions`. It runs only from `prepack` (ADR-030). Add `dist/` to `.gitignore`.
+- `pnpm build` runs `tsc -p tsconfig.build.json`, which emits JS and `.d.ts` files into `dist/`. It extends `tsconfig.json`, turns off `noEmit` and `allowImportingTsExtensions`, and sets `declaration`, `rewriteRelativeImportExtensions` and an explicit `rootDir: "src"`, which TypeScript 7 requires for emit. It runs only from `prepack` (ADR-030). Add `dist/` to `.gitignore`.
 - In `CLAUDE.md`, add `pnpm build` to the commands table and note the pack-time emit in the tech stack.
 - Publishing is a manual `pnpm publish` by the maintainer. This step makes the package publishable; it doesn't automate releases.
 - **Tests:** a CI job runs `pnpm pack`, installs the tarball into an empty temporary directory and checks three things: `md-rag --help` runs, `md-rag check` passes on a copy of `examples/docs`, and a small TypeScript consumer that imports `createEngine` from `md-rag` type-checks. None of these download a model.
