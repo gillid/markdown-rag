@@ -28,7 +28,7 @@ Status: `planned` · `in-progress` · `done`
   - a long document, which tests the per-document cap
   - long code blocks, which test the chunkers
 
-### 3.1 Cross-section fixture · `planned`
+### 3.1 Cross-section fixture · `done`
 
 - Add a team/service-directory style document to `examples/docs/` with separate heading sections (e.g. mission, owned services, contacts) where a realistic question's answer lives in a different section than the one that best matches semantically. Tests cross-section retrieval and whether `expand` or `getDocument` is needed to recover the fact (see the note on step 8's heading-boundary rule, and the eval query in step 21).
 
