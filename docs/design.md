@@ -46,7 +46,7 @@ This project is an **open-source engine** that makes a Git repository of Markdow
 
 **Read path (engine):**
 
-1. On startup the engine validates the KB and checks every sidecar against its document's hash and the configured embedding model. If any sidecar is missing or stale, it **refuses to start**.
+1. On startup the engine validates the storage and checks every sidecar against its document's hash and the configured embedding model. If any sidecar is missing or stale, it **refuses to start**.
 2. It builds the Orama index from the recorded chunks and loads the query embedder and the reranker. After a warm-up it reports ready.
 3. For each query:
    - embed the query
@@ -90,7 +90,7 @@ Details and rejected options are in the [ADR log](#4-decision-log-adr).
 
 ## 2. PoC Scope
 
-The PoC is the smallest system that proves the idea end to end: an agent gets relevant, cited context from a sample KB, through HTTP or the CLI, within the latency target.
+The PoC is the smallest system that proves the idea end to end: an agent gets relevant, cited context from a sample knowledge base, through HTTP or the CLI, within the latency target.
 
 ### In scope
 
@@ -116,13 +116,13 @@ The PoC is the smallest system that proves the idea end to end: an agent gets re
 10. **CLI:** `mdrag search "<query>"`, with Markdown output by default and a `--json` option.
 11. **Agent setup doc:** a prompt/skill snippet that teaches an agent (e.g. Claude Code) to use the HTTP API or the CLI. It covers when to use each search mode, gives worked request examples, shows the output format, lists what the tool can and cannot do, and tells the agent to search again with a refined query rather than rely on a weak result.
 12. **Evaluation:** `mdrag eval` runs golden queries and reports Recall@K, MRR and nDCG@N. `--bench` adds per-stage latency percentiles. Ablation flags (`--no-rerank`, `--mode`) measure what each stage contributes, and `--save` / `--compare` diff against a saved baseline run.
-13. **Sample KB and golden queries:** checked into the repo and used by tests, eval and the demo.
+13. **Sample knowledge base and golden queries:** checked into the repo and used by tests, eval and the demo.
 14. **Integrator documentation:** the contract, the sidecar format, the commands and the configuration.
 
 ### Success criteria
 
-- An agent can answer questions from `examples/kb` through the HTTP API and through `mdrag search`, with correct citations.
-- On the sample KB, `mdrag eval` reaches Recall@30 ≥ 0.9 and MRR ≥ 0.7. Thresholds will be revisited once the sample set exists. The eval also shows whether reranking improves results enough to justify its latency.
+- An agent can answer questions from `examples/docs` through the HTTP API and through `mdrag search`, with correct citations.
+- On the sample knowledge base, `mdrag eval` reaches Recall@30 ≥ 0.9 and MRR ≥ 0.7. Thresholds will be revisited once the sample set exists. The eval also shows whether reranking improves results enough to justify its latency.
 - `mdrag eval --bench` meets the §1.3 latency target on reference hardware.
 - Editing one document and running `mdrag embed` re-processes only that document, and re-embeds only its changed chunks.
 
@@ -136,10 +136,10 @@ These are deliberately left out of the PoC. Each one is useful but not needed to
 | Auth (bearer, OIDC, mTLS) and per-user ACLs | An integration concern that belongs at the ingress (ADR-016) |
 | LLM chunker: an LLM groups structural blocks into chunks (never rewriting text), instead of the structure-aware splitter | Headings are a hard, deterministic chunk boundary (ADR-011), so it can only add value on documents with no heading structure at all — and even there, packing consecutive blocks to the size target (ADR-011) already covers it without an LLM call. Deferred until eval shows a real gap the splitter can't cover (ADR-024, superseded by ADR-028) |
 | Contextual enrichment: an LLM-written document summary and context line per chunk, prepended before embedding | Proven gains, and Onyx ships it on by default (~50-token document summary, ~64-token chunk context). It needs the LLM chunker working first and can come from the same LLM call (ADR-024) |
-| Link-graph boost from Markdown links between KB documents | Grapevine boosts documents that many others reference. It could help cross-linked KBs, but it needs link extraction and eval evidence (ADR-026) |
+| Link-graph boost from Markdown links between knowledge base documents | Grapevine boosts documents that many others reference. It could help cross-linked documents, but it needs link extraction and eval evidence (ADR-026) |
 | External embedding and reranking providers | Local models are enough under A1 and A2. The interfaces already allow adding them (ADR-009) |
 | Serialised index snapshot for faster startup | Only worth it near the corpus ceiling (ADR-007) |
-| Reference GitHub Actions workflow for KB repos (`mdrag embed` on push, `mdrag check` gate, eval regression gate) | An integration concern; the commands make it a few lines of YAML |
+| Reference GitHub Actions workflow for consuming repos (`mdrag embed` on push, `mdrag check` gate, eval regression gate) | An integration concern; the commands make it a few lines of YAML |
 | Example exporters (Slack, Confluence, GitHub) | Ingestion is out of scope (ADR-001) |
 | Per-source recency settings | Global settings are enough to validate the blend |
 | Prometheus metrics and opt-in query logging | The PoC needs only stderr logs and `--bench` |
@@ -171,11 +171,11 @@ Each record: **Decision**, then **Why**, then **Rejected** options. Superseded r
 
 **ADR-003 · The contract is Markdown with required YAML frontmatter: `title`, `source` and `updated_at` are required; `url` and `tags` are optional; unknown keys are passed through.** *Why:* `updated_at` is the only reliable input for recency, because Git commit time is wrong after bulk re-exports and file mtime changes on checkout. `url` is the only way back to the original source. `title` and `source` could be derived, but requiring them keeps the contract explicit. Exporter-owned maintenance metadata such as `source_id` and `exported_at` is allowed. Engine-owned metadata lives in sidecars (ADR-005). *Rejected:* optional frontmatter with fallbacks (implicit behaviour that is hard to debug); no frontmatter (no reliable recency); native JSON sources (exporters render them to Markdown instead).
 
-**ADR-004 · A document's identity is its path relative to the KB root.** *Why:* overwriting a file updates the document and deleting it removes the document. Staleness is handled without a separate registry. *Rejected:* an ID field in frontmatter (two sources of identity that can drift apart).
+**ADR-004 · A document's identity is its path relative to the knowledge base root.** *Why:* overwriting a file updates the document and deleting it removes the document. Staleness is handled without a separate registry. *Rejected:* an ID field in frontmatter (two sources of identity that can drift apart).
 
 **ADR-005 · Each document has a sidecar at `.vectors/<doc-path>.vec.json` recording `doc_hash`, chunker ID, embedding model ID and its chunks (offsets, breadcrumb, anchor, chunk hash, vector).** *Why:* the document hash makes freshness a trivial comparison that needs no model or chunker. Recording the chunks means non-deterministic chunkers (such as an LLM) are fine, and the server never has to re-chunk. Chunk hashes let unchanged chunks keep their vectors. Offsets instead of copies of the text keep repository growth down (A7). Line endings are normalised to LF before hashing and computing offsets, so the result is the same on Windows and Unix checkouts. There are no timestamps, because they would churn diffs and Git already records history. *Rejected:* one content-addressed file per chunk (many tiny files and a garbage-collection step); sidecars next to each document (clutters the tree exporters own); a copy of the chunk text in the sidecar (duplicates the content); re-chunking at server startup (requires a deterministic chunker, which rules out LLM chunking).
 
-**ADR-006 · The server fails fast if any sidecar is missing, stale (`doc_hash` mismatch) or built with a different embedding model.** *Why:* a KB that breaks the contract must never serve silently degraded results. Under a rolling update, the previous version keeps serving. *Rejected:* embedding or re-chunking at startup (hides pipeline bugs and makes startup time unpredictable).
+**ADR-006 · The server fails fast if any sidecar is missing, stale (`doc_hash` mismatch) or built with a different embedding model.** *Why:* a knowledge base that breaks the contract must never serve silently degraded results. Under a rolling update, the previous version keeps serving. *Rejected:* embedding or re-chunking at startup (hides pipeline bugs and makes startup time unpredictable).
 
 **ADR-007 · The index is built in memory at startup from the sidecars, with no serialised artifact.** *Why:* with chunks and vectors already recorded, indexing takes seconds at PoC scale. *Rejected (deferred):* an Orama snapshot. *Rejected:* hot reload.
 

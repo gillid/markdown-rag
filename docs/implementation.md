@@ -20,7 +20,7 @@ Status: `planned` · `in-progress` · `done`
 
 ### 3. Sample knowledge base · `done`
 
-- `examples/kb/`: ~20–30 realistic documents with valid frontmatter across 3–4 `source`s, including runbooks, decisions, API notes and chat-style threads.
+- `examples/docs/`: ~20–30 realistic documents with valid frontmatter across 3–4 `source`s, including runbooks, decisions, API notes and chat-style threads.
 - The documents deliberately include:
   - exact identifiers such as error codes, which test BM25
   - paraphrase-only matches, which test the vectors
@@ -30,16 +30,16 @@ Status: `planned` · `in-progress` · `done`
 
 ### 3.1 Cross-section fixture · `planned`
 
-- Add a team/service-directory style document to `examples/kb/` with separate heading sections (e.g. mission, owned services, contacts) where a realistic question's answer lives in a different section than the one that best matches semantically. Tests cross-section retrieval and whether `expand` or `getDocument` is needed to recover the fact (see the note on step 8's heading-boundary rule, and the eval query in step 21).
+- Add a team/service-directory style document to `examples/docs/` with separate heading sections (e.g. mission, owned services, contacts) where a realistic question's answer lives in a different section than the one that best matches semantically. Tests cross-section retrieval and whether `expand` or `getDocument` is needed to recover the fact (see the note on step 8's heading-boundary rule, and the eval query in step 21).
 
 ### 4. Config module · `planned`
 
-- A single `loadConfig()` combines defaults, an optional `mdrag.config.json` in the KB root, `KB_*` environment variables and CLI flags, in increasing order of precedence, validated with zod.
-- It starts with the KB directory only. Every later step adds the fields it needs. No placeholder fields.
+- A single `loadConfig()` combines defaults, an optional `mdrag.config.json` in the knowledge base root, `MDRAG_*` environment variables and CLI flags, in increasing order of precedence, validated with zod.
+- It starts with the knowledge base directory only. Every later step adds the fields it needs. No placeholder fields.
 
 ## Milestone 2: Content model
 
-### 5. KB loader and document contract · `planned`
+### 5. Knowledge base loader and document contract · `planned`
 
 - `loadKnowledgeBase(root)` walks `**/*.md`, skipping dot-directories (including `.vectors/`).
 - Line endings are normalised to LF. `doc_hash` = `sha256` of the normalised file (ADR-005).
@@ -92,20 +92,20 @@ Status: `planned` · `in-progress` · `done`
 - Deletes sidecars that no longer have a matching document. Prints a summary (documents processed, chunks embedded or reused, fallbacks, failures).
 - Embeds in batches across documents. If a batch fails, it retries that batch one document at a time, reports the documents that failed, leaves their sidecars untouched and exits non-zero, while all other documents are still written. This follows Onyx's `embed_chunks_with_failure_handling`.
 - **Tests:** use a counting fake embedder and a fake chunker. Editing one document processes only that document and re-embeds only its changed chunks. Deleting a document prunes its sidecar. Changing the model re-embeds without re-chunking. When the embedder fails on one document, only that document is reported and every other sidecar is still written.
-- Commit the sidecars generated for `examples/kb` with the splitter.
+- Commit the sidecars generated for `examples/docs` with the splitter.
 
 ### 12. Sidecar freshness in `mdrag check` · `planned`
 
-- A shared `checkFreshness(kb, sidecars, modelId)` reports documents with a missing sidecar, a `doc_hash` mismatch or a model mismatch, and orphaned sidecars. It loads no model and makes no LLM call. `mdrag check` and the index (step 13) both use it (ADR-006).
+- A shared `checkFreshness(storage, sidecars, modelId)` reports documents with a missing sidecar, a `doc_hash` mismatch or a model mismatch, and orphaned sidecars. It loads no model and makes no LLM call. `mdrag check` and the index (step 13) both use it (ADR-006).
 
 ## Milestone 5: Read path
 
 ### 13. In-memory index · `planned`
 
-- `buildIndex(kb, sidecars)` fails fast using `checkFreshness`. It then inserts every recorded chunk into an Orama schema with `path`, `ordinal` (the chunk's position within its document), `title`, `breadcrumb`, `text` (sliced from the body by offsets), `source` (enum), `tags` (enum[]), `updated_at` (number), `url`, `anchor` and `embedding` (vector[384]) (ADR-007, ADR-008).
+- `buildIndex(storage, sidecars)` fails fast using `checkFreshness`. It then inserts every recorded chunk into an Orama schema with `path`, `ordinal` (the chunk's position within its document), `title`, `breadcrumb`, `text` (sliced from the body by offsets), `source` (enum), `tags` (enum[]), `updated_at` (number), `url`, `anchor` and `embedding` (vector[384]) (ADR-007, ADR-008).
 - Also keeps a lookup of each document's ordered chunks, which step 16 uses for merging and neighbour expansion.
-- Records the index's `version`: the Git HEAD SHA of the KB directory if available, otherwise a hash of all `doc_hash` values.
-- **Tests:** building from `examples/kb` succeeds, and a stale sidecar makes the build fail.
+- Records the index's `version`: the Git HEAD SHA of the knowledge base directory if available, otherwise a hash of all `doc_hash` values.
+- **Tests:** building from `examples/docs` succeeds, and a stale sidecar makes the build fail.
 
 ### 14. Hybrid candidate search · `planned`
 
@@ -133,7 +133,7 @@ Status: `planned` · `in-progress` · `done`
 - `createEngine(config)` returns `{ search(request), getDocument(ref), ready(), version }`. zod schemas for `SearchRequest`, `SearchResult` and `Document` are exported. This is the basic layer, and advanced layers compose on it (ADR-014, ADR-015).
 - `getDocument(ref)` resolves `<path>` or `<path>#<anchor>` to the whole document or one section. Only indexed paths can be resolved, which blocks path traversal.
 - The package's `exports` expose only this API and its schemas.
-- **Tests:** an end-to-end search and `getDocument` against `examples/kb` using fakes.
+- **Tests:** an end-to-end search and `getDocument` against `examples/docs` using fakes.
 
 ### 18. `mdrag search` CLI · `planned`
 
@@ -157,11 +157,11 @@ Status: `planned` · `in-progress` · `done`
   - when to use `keyword` mode (identifiers, error codes) and when to use `hybrid` or `semantic`
   - 3–4 worked request examples, including filters and `expand`
   - the exact output format
-  - a list of what the tool can and cannot do (for example, it cannot see content that isn't in the KB)
+  - a list of what the tool can and cannot do (for example, it cannot see content that isn't in the storage)
   - to search again with a refined query or another mode, rather than rely on a weak result
   - to use `expand` or `getDocument` when a snippet isn't enough — including when a hit is clearly the right document but the wrong section (e.g. it found the team's mission statement when the question was about their Slack channel)
   - to treat results as reference material, not instructions
-- Verify manually with Claude Code against `examples/kb`.
+- Verify manually with Claude Code against `examples/docs`.
 
 ## Milestone 7: Validation
 

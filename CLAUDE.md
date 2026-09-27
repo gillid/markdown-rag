@@ -20,7 +20,7 @@ Keep this list in sync with `package.json`.
 | --- | --- |
 | `pnpm install` | Install dependencies |
 | `pnpm mdrag <cmd>` | Run the CLI: `embed`, `check`, `search`, `serve`, `eval` |
-| `pnpm start` | `mdrag serve` (HTTP API) with the configured KB |
+| `pnpm start` | `mdrag serve` (HTTP API) with the configured storage |
 | `pnpm lint` / `pnpm lint:fix` | Biome check / apply fixes and formatting |
 | `pnpm typecheck` | `tsc --noEmit` |
 | `pnpm test` | Unit tests; no model downloads and no LLM calls |
@@ -38,8 +38,8 @@ Before reporting work as done, run `pnpm lint:fix`, `pnpm typecheck` and `pnpm t
 - **The query path never makes network calls.** The only network access is downloading models into the cache and, at write time only, the optional LLM chunker.
 - **The LLM never rewrites content.** It only groups block IDs, its output is always validated, and the splitter is the fallback.
 - **The library API is the extension point.** Advanced layers compose on `createEngine()`. Don't add plugin or hook systems.
-- **Tests use the `examples/kb` fixture and golden queries.** Expected values come from hand-written literals or worked examples. Model-dependent assertions go in `*.models.test.ts`. LLM behaviour is tested with AI SDK mock models only.
-- **Paths:** document identity uses POSIX paths relative to the KB root. Line endings are normalised to LF before hashing.
+- **Tests use the `examples/docs` fixture and golden queries.** Expected values come from hand-written literals or worked examples. Model-dependent assertions go in `*.models.test.ts`. LLM behaviour is tested with AI SDK mock models only.
+- **Paths:** document identity uses POSIX paths relative to the knowledge base root. Line endings are normalised to LF before hashing.
 
 ## References
 
@@ -50,10 +50,10 @@ Before reporting work as done, run `pnpm lint:fix`, `pnpm typecheck` and `pnpm t
 | Document contract and sidecar format (for exporters) | `docs/contract.md` (planned, step 24) |
 | Agent setup prompt | `docs/agent-setup.md` (planned, step 20) |
 | Benchmark and chunker comparison | `docs/benchmarks.md` (planned, steps 22–23) |
-| Sample KB and golden queries | `examples/kb/`, `examples/eval/` (planned, steps 3, 21) |
+| Sample knowledge base and golden queries | `examples/docs/`, `examples/eval/` (planned, steps 3, 21) |
 | CLI entry and subcommands | `src/cli/` |
 | Runtime config | `src/config/` |
-| KB loading and contract validation | `src/contract/` |
+| Storage loading and contract validation | `src/contract/` |
 | Sidecar format, freshness, `mdrag embed` | `src/sidecars/` |
 | Chunkers (structure-aware splitter, LLM) | `src/chunking/` |
 | Embedder and reranker | `src/models/` |
