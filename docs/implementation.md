@@ -82,7 +82,7 @@ Status: `planned` · `in-progress` · `done`
 - An `Embedder` interface (`embedDocuments`, `embedQuery`, `modelId`, `dims`) and a transformers.js implementation: `feature-extraction` with mean pooling and normalisation, q8 weights, and a pinned model revision (ADR-009, ADR-010).
 - Config covers the model cache directory (`modelsDir`, default `<targetDir>/models/`, overridable with `--models-dir`) and whether remote models are allowed (ADR-022, ADR-031). Several knowledge bases in one repository each have their own `targetDir`, so they share one cache by passing the same `--models-dir` (ADR-037). Both are passed to transformers.js explicitly, never through environment variables (ADR-032). The model loads lazily, once. The BGE query instruction prefix is applied only to queries.
 - Model presets map a model ID (the value recorded in sidecars) to its Hugging Face repository, pinned revision, dimensions and query prefix. The PoC has one embedding preset, `bge-small-en-v1.5` (ADR-010).
-- A shared `ensureEngineDir(targetDir)` creates `targetDir` and writes `<targetDir>/.gitignore` (ignoring `models/`) with its canonical content, overwriting any edits, since nothing in `targetDir` is hand-edited (ADR-031). Model loading calls it before anything is downloaded into the default cache, and step 11 reuses it.
+- A shared `ensureEngineDir(targetDir)` creates `targetDir` and writes `<targetDir>/.gitignore` with its canonical content, `*`, which ignores the whole folder, overwriting any edits, since nothing in `targetDir` is hand-edited (ADR-031, ADR-038). Model loading calls it before anything is downloaded into the default cache, and step 11 reuses it.
 - **Tests:** a `*.models.test.ts` checks that a paraphrase pair outscores an unrelated pair, and that vectors have 384 dimensions and are L2-normalised.
 
 ### 11. `md-rag embed` · `planned`
@@ -95,11 +95,11 @@ Status: `planned` · `in-progress` · `done`
 - Deletes sidecars that no longer have a matching document. Prints a summary (documents processed, chunks embedded or reused, failures).
 - Embeds in batches across documents. If a batch fails, it retries that batch one document at a time, reports the documents that failed, leaves their sidecars untouched and exits non-zero, while all other documents are still written. This follows Onyx's `embed_chunks_with_failure_handling`.
 - **Tests:** use a counting fake embedder and a fake chunker. Editing one document processes only that document and re-embeds only its changed chunks. Deleting a document prunes its sidecar. A sidecar recorded with a different model is re-embedded without re-chunking. When the embedder fails on one document, only that document is reported and every other sidecar is still written. The first run on a fresh knowledge base creates `<targetDir>/.gitignore`, and an edited one is restored to its canonical content.
-- Commit `examples/docs/.md-rag/` (the sidecars generated with the splitter, plus its `.gitignore`).
+- Sidecars are never committed, including for `examples/docs` (ADR-038). Tests that need them generate them into a temporary `targetDir`.
 
 ### 12. Sidecar freshness in `md-rag check` · `planned`
 
-- A shared `checkFreshness(storage, sidecars)` reports documents with a missing sidecar or a `doc_hash` mismatch, orphaned sidecars, and sidecars whose recorded model differs from the rest. On success it returns the one model ID they share, which the read path loads (ADR-006, ADR-032). A model ID the engine has no preset for (step 10) is also an error. It loads no model and makes no LLM call. `md-rag check` and the index (step 13) both use it. Orphaned sidecars also catch two knowledge bases sharing one `targetDir` (ADR-037). When `<targetDir>/vectors/` doesn't exist yet, the error names the directory it looked in and says to run `md-rag embed` first, or to pass the `--target-dir` that `embed` used (ADR-031, ADR-037).
+- A shared `checkFreshness(storage, sidecars)` reports documents with a missing sidecar or a `doc_hash` mismatch, orphaned sidecars, and sidecars whose recorded model differs from the rest. On success it returns the one model ID they share, which the read path loads (ADR-006, ADR-032). A model ID the engine has no preset for (step 10) is also an error. It loads no model and makes no LLM call. `md-rag check` and the index (step 13) both use it. Orphaned sidecars also catch two knowledge bases sharing one `targetDir` (ADR-037). `md-rag check` always checks both the contract and freshness and is meant to run after `embed` (ADR-038). When `<targetDir>/vectors/` doesn't exist yet, it still reports contract errors, then fails with an error that names the directory it looked in and says to run `md-rag embed` first, or to pass the `--target-dir` that `embed` used (ADR-031, ADR-037).
 
 ## Milestone 5: Read path
 
@@ -108,13 +108,13 @@ Status: `planned` · `in-progress` · `done`
 - `buildIndex(storage, sidecars)` fails fast using `checkFreshness`. It then inserts every recorded chunk into an Orama schema with `path`, `ordinal` (the chunk's position within its document), `title`, `breadcrumb`, `text` (sliced from the body by offsets), `source` (enum), `tags` (enum[]), `dirs` (enum[]: every ancestor directory of the path, for the `dir` filter), `updated_at` (number), `url`, `anchor` and `embedding` (a vector sized to the shared model's `dims`, 384 for the default) (ADR-007, ADR-008, ADR-035).
 - Also keeps a per-document lookup of its summary (ADR-035), signals, outline (headings with anchor and depth) and ordered chunks. Step 16 uses it for signals, merging and neighbour expansion, and step 17 for the unranked operations.
 - Records the index's `version`: the Git HEAD SHA of the knowledge base directory if available, otherwise a hash of all `doc_hash` values.
-- **Tests:** building from `examples/docs` succeeds, and a stale sidecar makes the build fail.
+- **Tests:** building from `examples/docs`, with sidecars generated by `embed` and a fake embedder into a temporary `targetDir`, succeeds, and a stale sidecar makes the build fail.
 
 ### 14. Hybrid candidate search · `planned`
 
 - `searchCandidates(index, { text, vector, k, mode, filter })` maps `mode` to Orama's hybrid, fulltext or vector search. Hybrid uses configurable `hybridWeights` (default 0.5/0.5). `title` gets a small boost (default 1.1, tuned in step 23), and English stopwords are applied through the language setting. The shared filter goes through `where`: `sources` any-of, `tags` all-of, `tags_any` any-of, `dir` against `dirs`, and `updated_after` (ADR-008, ADR-010, ADR-013, ADR-035). The same filter semantics are available as a plain predicate over document summaries for step 17's unranked operations, and tests check that both agree.
 - In `keyword` mode the query embedding is skipped.
-- **Tests:** an exact error-code query finds its document in `keyword` mode, and a paraphrase query finds its document in `semantic` mode (using stored sidecar vectors plus a fixed query vector, so no model is needed). Filters narrow results in every mode.
+- **Tests:** an exact error-code query finds its document in `keyword` mode, and filters narrow results in every mode, using sidecars from a fake embedder. A `*.models.test.ts` embeds `examples/docs` into a temporary `targetDir` and checks that a paraphrase query finds its document in `semantic` mode (sidecars are not committed, so there are no real vectors to reuse, ADR-038).
 
 ### 15. Reranker · `planned`
 
@@ -171,7 +171,7 @@ Status: `planned` · `in-progress` · `done`
 - `pnpm build` runs `tsc -p tsconfig.build.json`, which emits JS and `.d.ts` files into `dist/`. It extends `tsconfig.json`, turns off `noEmit` and `allowImportingTsExtensions`, and sets `declaration`, `rewriteRelativeImportExtensions` and an explicit `rootDir: "src"`, which TypeScript 7 requires for emit. It runs only from `prepack` (ADR-030). Add `dist/` to `.gitignore`.
 - In `CLAUDE.md`, add `pnpm build` to the commands table and note the pack-time emit in the tech stack.
 - Publishing is a manual `pnpm publish` by the maintainer. This step makes the package publishable; it doesn't automate releases.
-- **Tests:** a CI job runs `pnpm pack`, installs the tarball into an empty temporary directory and checks three things: `md-rag --help` runs, `md-rag check` passes on a copy of `examples/docs`, and a small TypeScript consumer that imports `createEngine` from `md-rag` type-checks. None of these download a model.
+- **Tests:** a CI job runs `pnpm pack`, installs the tarball into an empty temporary directory and checks three things: `md-rag --help` runs, `md-rag check` on a copy of `examples/docs` reports no contract errors and fails only with the "run `md-rag embed` first" error, and a small TypeScript consumer that imports `createEngine` from `md-rag` type-checks. None of these download a model.
 
 ### 20. Agent setup doc · `planned`
 
@@ -192,7 +192,7 @@ Status: `planned` · `in-progress` · `done`
 ### 21. `md-rag eval` with quality metrics · `planned`
 
 - `examples/eval/queries.yaml` holds entries of the form `{ query, expected: [path or ref], filters? }`, covering each fixture case from step 3.
-- `md-rag eval` reports Recall@K, MRR and nDCG@N, with a per-query breakdown of misses. `--sidecars <dir>` lets you evaluate against an alternative sidecar set (e.g. one built with a different chunk-size target, step 23).
+- `md-rag eval` reports Recall@K, MRR and nDCG@N, with a per-query breakdown of misses. It runs after `md-rag embed`, and `--target-dir` points it at an alternative sidecar set (e.g. one built with a different chunk-size target, step 23, ADR-037).
 - Include a query against the step 3.1 directory-style fixture whose answer lives in a different section/chunk than the one that best matches semantically. This checks whether retrieval at least surfaces the right *document* (recall at the doc level, not just the chunk level) — the follow-up step of using `getDocument`/`expand` to reach the specific fact is an agent behaviour, verified against `docs/agent-setup.md` (step 20), not a retrieval metric.
 - Ablation flags `--no-rerank` and `--mode <hybrid|keyword|semantic>` measure what each stage contributes (ADR-027).
 - `--save <file>` writes the metrics and per-query ranks as JSON. `--compare <file>` prints the differences against a saved run, both overall and per query (after Grapevine's `search-eval`).
@@ -213,4 +213,4 @@ Status: `planned` · `in-progress` · `done`
 ### 24. Integrator documentation · `planned`
 
 - `README.md` covers: what the project is, a no-install quick start (`npx md-rag embed`, `check`, `search` and `serve` against a local directory), installing it (`pnpm add md-rag`) for the library API, and the configuration reference (the CLI flags and the matching `createEngine` options, ADR-032).
-- `docs/contract.md` is the full frontmatter contract (including `signals`, ADR-034), the `.md-rag/` layout and the sidecar format, written for exporter authors. It spells out the exporter's obligations under A4: byte-identical output for unchanged content (no export timestamps in files), `updated_at` taken from the source's change time, and tags as the filterable vocabulary (ADR-035).
+- `docs/contract.md` is the full frontmatter contract (including `signals`, ADR-034), the engine folder's layout and the sidecar format, and how to run `md-rag embed` in a deployment pipeline with a cached engine folder (ADR-038), written for exporter authors and integrators. It spells out the exporter's obligations under A4: byte-identical output for unchanged content (no export timestamps in files), `updated_at` taken from the source's change time, and tags as the filterable vocabulary (ADR-035).
