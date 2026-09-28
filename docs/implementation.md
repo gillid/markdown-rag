@@ -55,9 +55,9 @@ Status: `planned` · `in-progress` · `done`
 ### 7. Sidecar format · `planned`
 
 - Read and write `.md-rag/vectors/<doc-path>.vec.json` with the fields `{ format: 1, doc_hash, chunker, model, dims, chunks: [{ start, end, breadcrumb, anchor, hash, vector }] }` (ADR-005, ADR-031).
-- `start` and `end` are offsets into the normalised body. `hash` = `sha256(breadcrumb + "\n" + text)`. `vector` is base64-encoded little-endian float32.
+- `start` and `end` are offsets into the normalised body. `hash` = `sha256(breadcrumb + "\n" + text)`. `vector` is base64-encoded little-endian float16, widened to float32 when read (ADR-033).
 - The output is written deterministically (stable key order, trailing newline), so unchanged input produces a byte-identical file.
-- **Tests:** round trip, a byte-exact literal fixture, and offsets resolving back to the expected text.
+- **Tests:** round trip (within float16 precision), a byte-exact literal fixture, and offsets resolving back to the expected text.
 
 ## Milestone 3: Chunking
 
