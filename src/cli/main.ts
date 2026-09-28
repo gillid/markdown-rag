@@ -2,8 +2,6 @@ import { pathToFileURL } from "node:url";
 import { runCheck } from "./check.ts";
 import type { CliResult } from "./result.ts";
 
-export type { CliResult };
-
 export const HELP = `Usage: md-rag <command> [options]
 
 Commands:
