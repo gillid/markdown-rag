@@ -11,7 +11,7 @@ Status: `planned` · `in-progress` · `done`
 - pnpm project, Node 24 (`engines`, `.nvmrc`), `"type": "module"`, MIT `LICENSE` (ADR-020, ADR-021).
 - `tsconfig.json` set up for type stripping: `noEmit`, `erasableSyntaxOnly`, `allowImportingTsExtensions`, `verbatimModuleSyntax`, `strict`.
 - Biome, Vitest, and the scripts listed in `CLAUDE.md`. Model-backed tests (`*.models.test.ts`) are excluded from `pnpm test`.
-- An `md-rag` script (`pnpm md-rag <cmd>`) backed by `src/cli/main.ts`, which dispatches subcommands with `node:util` `parseArgs`. At this stage `pnpm md-rag --help` is the only command.
+- An `md-rag` script (`pnpm md-rag <cmd>`) backed by `src/cli/main.ts`, which dispatches subcommands from the first positional argument; each subcommand parses its own flags with `node:util` `parseArgs`. At this stage `pnpm md-rag --help` is the only command.
 - **Done when:** `pnpm lint`, `pnpm typecheck` and `pnpm test` pass on a smoke test.
 
 ### 2. Project CI · `done`
@@ -49,7 +49,7 @@ Status: `planned` · `in-progress` · `done`
 - Returns documents containing `path` (POSIX, relative to `sourceDir`), `docHash`, the parsed tree, the body, and typed metadata (`updated_at` as epoch milliseconds).
 - **Tests:** valid and invalid fixtures, including out-of-range and reserved signal names; CRLF and LF versions of a file give the same hash.
 
-### 6. `md-rag check` (contract only) · `planned`
+### 6. `md-rag check` (contract only) · `done`
 
 - A CLI command that runs the loader and exits non-zero with the aggregated errors. Sidecar freshness is added in step 12.
 

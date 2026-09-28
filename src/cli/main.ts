@@ -1,40 +1,32 @@
 import { pathToFileURL } from "node:url";
-import { parseArgs } from "node:util";
+import { runCheck } from "./check.ts";
+import type { CliResult } from "./result.ts";
 
 export const HELP = `Usage: md-rag <command> [options]
 
 Commands:
-  (none yet)
+  check   Validate the knowledge base contract
 
 Options:
   -h, --help  Show this help message
 `;
 
-export interface CliResult {
-  readonly exitCode: number;
-  readonly stdout: string;
-  readonly stderr: string;
-}
+export async function run(argv: readonly string[]): Promise<CliResult> {
+  const [command, ...rest] = argv;
 
-export function run(argv: readonly string[]): CliResult {
-  const { values } = parseArgs({
-    args: argv,
-    options: {
-      help: { type: "boolean", short: "h" },
-    },
-    allowPositionals: true,
-    strict: false,
-  });
-
-  if (values.help || argv.length === 0) {
+  if (command === undefined || command === "--help" || command === "-h") {
     return { exitCode: 0, stdout: HELP, stderr: "" };
+  }
+
+  if (command === "check") {
+    return runCheck(rest);
   }
 
   return { exitCode: 1, stdout: "", stderr: `Unknown command\n\n${HELP}` };
 }
 
-function main(): void {
-  const result = run(process.argv.slice(2));
+async function main(): Promise<void> {
+  const result = await run(process.argv.slice(2));
   if (result.stdout) process.stdout.write(result.stdout);
   if (result.stderr) process.stderr.write(result.stderr);
   process.exitCode = result.exitCode;
