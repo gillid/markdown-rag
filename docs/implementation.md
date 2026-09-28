@@ -32,7 +32,7 @@ Status: `planned` · `in-progress` · `done`
 
 - Add a team/service-directory style document to `examples/docs/` with separate heading sections (e.g. mission, owned services, contacts) where a realistic question's answer lives in a different section than the one that best matches semantically. Tests cross-section retrieval and whether `expand` or `getDocument` is needed to recover the fact (see the note on step 8's heading-boundary rule, and the eval query in step 21).
 
-### 4. Config module · `in-progress`
+### 4. Config module · `done`
 
 - A single `loadConfig(input)` validates the caller's input (CLI flags, or the object passed to `createEngine`) against one zod schema, which fills in built-in defaults for the fields that have them. There's no config file, and it reads no environment variables (ADR-032).
 - It starts with the two directories only (ADR-037). `sourceDir` (`--source-dir`) is the knowledge base, is required and has no default, so nothing depends on where the process was started. `targetDir` (`--target-dir`) is the engine folder and defaults to `<sourceDir>/.md-rag/`. Relative paths resolve against the current directory, and a `targetDir` that is `sourceDir` or one of its parents is rejected. Every later step adds the fields it needs. No placeholder fields.
