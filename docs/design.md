@@ -150,6 +150,7 @@ These are deliberately left out of the PoC. Each one is useful but not needed to
 | Prometheus metrics and opt-in query logging | The PoC needs only stderr logs and `--bench` |
 | Multilingual model presets | English is assumed (A2) |
 | int8 vector quantisation in sidecars | Float16 (ADR-033) already halves repository growth (A7). int8 would halve it again, but at a quality cost that needs eval |
+| Duplicate-content advisory in `md-rag check` (identical chunk text across documents) | Multi-source corpora duplicate content, but exact duplicates across sources are rare. The chunk hash covers the breadcrumb, which starts with the title, so this would need its own text hash. If eval shows duplicates crowding results, query-time deduplication would help more than a check warning |
 | Hot index reload, container image | Restarting is simple; deployment is the integrator's concern (ADR-007, ADR-017) |
 
 ## 4. Decision Log (ADR)
@@ -163,7 +164,7 @@ Each record: **Decision**, then **Why**, then **Rejected** options. Superseded r
 | A1 | A deployment's corpus stays at or below ~100k chunks (≈ 10–20k typical documents). |
 | A2 | Content and queries are primarily English. |
 | A3 | Everyone who can reach a deployment may see all of its content. |
-| A4 | Exporters produce deterministic file paths and a meaningful `updated_at`. |
+| A4 | Exporters produce deterministic file paths and byte-identical output for unchanged content, and set `updated_at` to when the content changed at its source, not when it was exported. |
 | A5 | Hosts are x86-64 or arm64 with CPU support in `onnxruntime-node`. No GPU is needed. |
 | A6 | Whoever writes content can run Node.js and `md-rag embed` in their pipeline,. |
 | A7 | Repository growth from sidecars (~1 KB of vector per changed chunk per commit, ADR-033) is acceptable. |
@@ -174,7 +175,7 @@ Each record: **Decision**, then **Why**, then **Rejected** options. Superseded r
 
 **ADR-002 · A Git repository is the only storage.** *Why:* no database to run, and history, review and rollback come for free. *Rejected:* Postgres/pgvector and hosted vector databases (operational cost and a network hop, with no benefit under A1).
 
-**ADR-003 · The contract is Markdown with required YAML frontmatter: `title`, `source` and `updated_at` are required; `url` and `tags` are optional; unknown keys are passed through.** *Why:* `updated_at` is the only reliable input for recency, because Git commit time is wrong after bulk re-exports and file mtime changes on checkout. `url` is the only way back to the original source. `title` and `source` could be derived, but requiring them keeps the contract explicit. Exporter-owned maintenance metadata such as `source_id` and `exported_at` is allowed. Engine-owned metadata lives in sidecars (ADR-005). *Rejected:* optional frontmatter with fallbacks (implicit behaviour that is hard to debug); no frontmatter (no reliable recency); native JSON sources (exporters render them to Markdown instead).
+**ADR-003 · The contract is Markdown with required YAML frontmatter: `title`, `source` and `updated_at` are required; `url` and `tags` are optional; unknown keys are passed through.** *Why:* `updated_at` is the only reliable input for recency, because Git commit time is wrong after bulk re-exports and file mtime changes on checkout. `url` is the only way back to the original source. `title` and `source` could be derived, but requiring them keeps the contract explicit. Exporter-owned maintenance metadata such as `source_id` is allowed, as long as it doesn't change when the content doesn't: an `exported_at` stamp would change every document's hash, and rewrite its sidecar, on every export (A4). Engine-owned metadata lives in sidecars (ADR-005). *Rejected:* optional frontmatter with fallbacks (implicit behaviour that is hard to debug); no frontmatter (no reliable recency); native JSON sources (exporters render them to Markdown instead).
 
 **ADR-004 · A document's identity is its path relative to the knowledge base root.** *Why:* overwriting a file updates the document and deleting it removes the document. Staleness is handled without a separate registry. *Rejected:* an ID field in frontmatter (two sources of identity that can drift apart).
 
