@@ -20,6 +20,20 @@ describe("md-rag check", () => {
     expect(result.stderr).toContain("--source-dir is required");
   });
 
+  it("exits 1 on an unknown flag", async () => {
+    const result = await run(["check", "--bogus"]);
+    expect(result.exitCode).toBe(1);
+    expect(result.stdout).toBe("");
+    expect(result.stderr).toContain("Usage: md-rag check");
+  });
+
+  it("exits 0 and prints usage with --help", async () => {
+    const result = await run(["check", "--help"]);
+    expect(result.exitCode).toBe(0);
+    expect(result.stderr).toBe("");
+    expect(result.stdout).toContain("Usage: md-rag check");
+  });
+
   describe("against a broken knowledge base", () => {
     let root: string;
 
