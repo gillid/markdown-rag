@@ -34,6 +34,14 @@ describe("md-rag check", () => {
     expect(result.stdout).toContain("Usage: md-rag check");
   });
 
+  it("exits 1 with a clean error for a non-existent --source-dir", async () => {
+    const missing = join(tmpdir(), "md-rag-check-does-not-exist");
+    const result = await run(["check", "--source-dir", missing]);
+    expect(result.exitCode).toBe(1);
+    expect(result.stdout).toBe("");
+    expect(result.stderr).toContain("check:");
+  });
+
   describe("against a broken knowledge base", () => {
     let root: string;
 

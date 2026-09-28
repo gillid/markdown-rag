@@ -50,7 +50,17 @@ export async function runCheck(argv: readonly string[]): Promise<CliResult> {
     throw cause;
   }
 
-  const { documents, errors } = await loadKnowledgeBase(config);
+  let result: Awaited<ReturnType<typeof loadKnowledgeBase>>;
+  try {
+    result = await loadKnowledgeBase(config);
+  } catch (cause) {
+    return {
+      exitCode: 1,
+      stdout: "",
+      stderr: `check: ${(cause as Error).message}\n`,
+    };
+  }
+  const { documents, errors } = result;
 
   if (errors.length > 0) {
     const lines = errors
