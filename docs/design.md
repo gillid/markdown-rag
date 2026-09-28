@@ -1,6 +1,6 @@
 # Design: Static-Indexed In-Memory Context Gateway
 
-Status: Draft v6 · Last updated: 2026-09-27
+Status: Draft v7 · Last updated: 2026-09-28
 
 ## 1. The Idea
 
@@ -11,8 +11,8 @@ This project is an **open-source engine** that makes a Git repository of Markdow
 - **Git is the database.** Knowledge lives as Markdown files with a small frontmatter contract. Changes to files, reviews, history and rollbacks all come from Git.
 - **Chunks and vectors are committed next to the content.** Whoever updates the content also runs `md-rag embed`. It chunks each changed document with a structure-aware splitter, then embeds the chunks and records both in a per-document sidecar. Each sidecar carries the hash of the content it was built from, so only changed documents are processed again.
 - **The server is a pure function of a directory.** `md-rag serve` reads the Markdown and the sidecars, builds a hybrid (BM25 + vector) index in RAM, and answers queries. It has no state and no background jobs, and it writes nothing except the model cache. It embeds only the query.
-- **Precision comes from local reranking.** A small cross-encoder runs in-process on CPU and cuts the candidates down to a few cited snippets. Results are then blended with recency and filtered by a minimum score.
-- **The engine is a basic layer that others can build on.** It turns a query into ranked, cited results through a library API, an HTTP endpoint and a CLI, all shipped in one npm package. Anything more advanced, such as LLM post-processing into structured output, is built by integrators on top of the library API.
+- **Precision comes from local reranking.** A small cross-encoder runs in-process on CPU and cuts the candidates down to a few cited snippets. Results are then blended with recency and any ranking signals the documents declare, using weights the caller chooses, and filtered by a minimum score.
+- **The engine is a basic layer that others can build on.** It turns a query into ranked, cited results that show how they were scored, and lets callers browse and read the knowledge base by its metadata. All of this goes through a library API, an HTTP endpoint and a CLI, all shipped in one npm package. Anything more advanced, such as LLM post-processing into structured output, is built by integrators on top of the library API.
 
 ```
  Integrator-owned                        This project
@@ -25,7 +25,7 @@ This project is an **open-source engine** that makes a Git repository of Markdow
                                                        │ checkout
                                                        ▼
 ┌──────────────────────────── md-rag serve / createEngine() ──────────────────────────┐
-│  load docs + sidecars → Orama hybrid index (RAM) → query embed → rerank → recency   │
+│  load docs + sidecars → Orama hybrid index (RAM) → query embed → rerank → blend     │
 └──────┬──────────────────────────┬──────────────────────────┬────────────────────────┘
        │ library API              │ HTTP JSON                │ CLI
        ▼                          ▼                          ▼
@@ -54,13 +54,14 @@ This project is an **open-source engine** that makes a Git repository of Markdow
    - retrieve candidates using hybrid, keyword-only or semantic-only search (optionally filtered)
    - cap the number of chunks per document
    - rerank with the cross-encoder
-   - blend in recency
+   - blend in weighted signals: recency, plus any signals the documents declare (ADR-034)
    - apply the score cutoff
    - take the top N results
    - merge adjacent hits from the same document, and optionally expand each hit with its neighbouring chunks
-   - return the results with citations
+   - return the results with citations and per-stage scores (ADR-036)
 
-   Each request can override the search mode, result count, cutoff, recency weight, neighbour expansion and filters.
+   Each request can override the search mode, result count, cutoff, signal weights, neighbour expansion and filters.
+4. Besides ranked search, the engine answers unranked operations from the same loaded documents: an overview of what the knowledge base holds, a filtered list of documents, and one document with its outline, with or without its body. All of them share one filter and one document summary, so a caller can orient itself, narrow down and then read (ADR-035).
 
 There is no LLM on the query path. The calling agent is already an LLM: it reformulates queries and searches again. The engine's job is to make each call fast and precise (ADR-025).
 
@@ -71,15 +72,15 @@ There is no LLM on the query path. The calling agent is already an LLM: it refor
 Details and rejected options are in the [ADR log](#4-decision-log-adr).
 
 - **Runtime and language:** Node.js 24 LTS, TypeScript run through native type stripping, and pnpm (ADR-020).
-- **Content contract:** Markdown with required frontmatter (`title`, `source`, `updated_at`) and optional `url` and `tags`. Unknown keys are passed through. Frontmatter is parsed in the same pass as the Markdown itself (ADR-003, ADR-023).
+- **Content contract:** Markdown with required frontmatter (`title`, `source`, `updated_at`) and optional `url`, `tags` and `signals` (named ranking inputs in [0, 1]). Unknown keys are passed through. Frontmatter is parsed in the same pass as the Markdown itself (ADR-003, ADR-023, ADR-034).
 - **Sidecars:** they record the chunks as well as the vectors, and freshness is decided by the document hash. The server never needs to run a chunker. Vectors are stored as base64 float16 (ADR-005, ADR-011, ADR-033).
 - **Chunking:** the PoC ships one chunker, a structure-aware splitter (ADR-011). Chunking stays pluggable so an LLM chunker can be added later; a design for one exists but is deferred beyond the PoC (ADR-024, ADR-028).
 - **Search:** Orama in-process hybrid search (ADR-008).
 - **Query-path models:** local only, through transformers.js on `onnxruntime-node`. The embedder is `bge-small-en-v1.5` and the reranker is `ms-marco-MiniLM-L-6-v2`. Both sit behind interfaces, so external providers could be added later (ADR-009, ADR-010, ADR-022).
-- **Interface:** a library (`createEngine`), HTTP JSON (`createHttpHandler` / `md-rag serve`) and a CLI (`md-rag search`). There's no MCP adapter and no auth in the PoC (ADR-014, ADR-016).
+- **Interface:** four operations (`overview`, `search`, `listDocuments` and `getDocument`) that share one filter and one document summary. Each is exposed through the library (`createEngine`), HTTP JSON (`createHttpHandler` / `md-rag serve`) and the CLI (`md-rag overview`, `search`, `list` and `get`). Search results carry their per-stage scores. There's no MCP adapter and no auth in the PoC (ADR-014, ADR-016, ADR-035, ADR-036).
 - **Distribution:** one npm package, `md-rag`, ships the library and the `md-rag` binary, so all three interfaces share one version and one contract. The package holds JavaScript that `tsc` emits at pack time, because Node won't strip types inside `node_modules` (ADR-029, ADR-030).
 - **Engine files and configuration:** everything the engine owns lives in `<root>/.md-rag/`: the committed sidecars and a git-ignored model cache. Nothing in it is edited by hand. Configuration comes from built-in defaults and the caller's CLI flags or config object, with no config file and no environment variables. The embedding model is the one the sidecars record (ADR-031, ADR-032).
-- **Scoring:** reranker score blended with recency after reranking. The search mode, cutoff, result count, recency weight and neighbour expansion have configured defaults that each request can override (ADR-012, ADR-013). The reranker has to prove its value in eval (ADR-027).
+- **Scoring:** after reranking, the reranker score is blended with weighted signals: the built-in recency signal and any signals documents declare. The blend is bounded, so the signals together can move a result by at most their summed weight. The engine provides the mechanism, and consumers provide the policy: exporters write signal values, and deployments and requests choose the weights. The search mode, cutoff, result count, signal weights and neighbour expansion have configured defaults that each request can override (ADR-012, ADR-013, ADR-034). The reranker has to prove its value in eval (ADR-027).
 
 ### 1.3 Guarantees and targets
 
@@ -97,28 +98,29 @@ The PoC is the smallest system that proves the idea end to end: an agent gets re
 
 ### In scope
 
-1. **Document contract:** loading `*.md` with required frontmatter, collecting validation errors across all files, and computing a document hash over normalised (LF) content.
+1. **Document contract:** loading `*.md` with required frontmatter and optional ranking `signals`, collecting validation errors across all files, and computing a document hash over normalised (LF) content.
 2. **Sidecar format:** stores the document hash, chunker ID, model ID and chunk records (offsets, breadcrumb, anchor, hash, vector), with vectors as base64 float16.
 3. **Chunker:** the structure-aware splitter. A lean LLM chunker was designed (ADR-024) and then deferred beyond the PoC (ADR-028, §3).
 4. **`md-rag embed`:** creates `.md-rag/` on first run, processes changed documents only, reuses vectors for unchanged chunks, prunes orphaned sidecars, and supports `--rechunk` to force re-chunking.
 5. **`md-rag check`:** validates the contract and checks sidecar freshness, with no model and no LLM. Exits non-zero on failure.
 6. **In-memory index:** built from sidecars at startup, failing fast on stale sidecars.
 7. **Retrieval pipeline:**
-   - Orama candidates in `hybrid`, `keyword` or `semantic` mode, with a boosted title field, English stopwords, and filters on `sources`, `tags` and `updated_after`
+   - Orama candidates in `hybrid`, `keyword` or `semantic` mode, with a boosted title field, English stopwords, and the shared filter (`sources`, `tags`, `tags_any`, `dir`, `updated_after`)
    - a per-document cap
    - cross-encoder reranking
-   - a recency blend
+   - a bounded blend of recency and document-declared signals, with per-request weights
    - a score cutoff and top N
    - adjacent-chunk merging and optional neighbour expansion
+   - per-stage scores on every result
    - per-request overrides for all of the above
-8. **Library API:** `createEngine(config)` exposing `search()` and `getDocument()`, plus exported zod schemas for requests and results, which is the extension point for advanced layers.
+8. **Library API:** `createEngine(config)` exposing `overview()`, `search()`, `listDocuments()` and `getDocument()`, plus exported zod schemas for the shared filter, the document summary, requests and results. This is the extension point for advanced layers.
 9. **HTTP API:**
-   - `POST /search` and `GET /documents/{ref}`
+   - `GET /overview`, `POST /search`, `GET /documents` and `GET /documents/{ref}`
    - `/healthz` and `/readyz`
    - `createHttpHandler(engine)`, so integrators can mount it in their own server, and `md-rag serve`, which runs it standalone
-10. **CLI:** `md-rag search "<query>"`, with Markdown output by default and a `--json` option.
+10. **CLI:** `md-rag overview`, `md-rag search "<query>"`, `md-rag list` and `md-rag get <ref>`, with Markdown output by default and a `--json` option.
 11. **Package:** one npm package, `md-rag`, that contains the library exports and the `md-rag` binary (the CLI and `md-rag serve`). It runs without installation through `npx md-rag` (ADR-029, ADR-030).
-12. **Agent setup doc:** a prompt/skill snippet that teaches an agent (e.g. Claude Code) to use the HTTP API or the CLI. It covers when to use each search mode, gives worked request examples, shows the output format, lists what the tool can and cannot do, and tells the agent to search again with a refined query rather than rely on a weak result. Every consumer of the package gets the same interface contract, so one snippet works across teams (ADR-029).
+12. **Agent setup doc:** a prompt/skill snippet that teaches an agent (e.g. Claude Code) to use the HTTP API or the CLI. It covers the orient, narrow and read loop across the four operations, when to use each search mode, gives worked request examples, shows the output format, lists what the tool can and cannot do, and tells the agent to search again with a refined query rather than rely on a weak result. Every consumer of the package gets the same interface contract, so one snippet works across teams (ADR-029).
 13. **Evaluation:** `md-rag eval` runs golden queries and reports Recall@K, MRR and nDCG@N. `--bench` adds per-stage latency percentiles. Ablation flags (`--no-rerank`, `--mode`) measure what each stage contributes, and `--save` / `--compare` diff against a saved baseline run.
 14. **Sample knowledge base and golden queries:** checked into the repo and used by tests, eval and the demo.
 15. **Integrator documentation:** the contract, the sidecar format, the commands and the configuration.
@@ -175,7 +177,7 @@ Each record: **Decision**, then **Why**, then **Rejected** options. Superseded r
 
 **ADR-002 · A Git repository is the only storage.** *Why:* no database to run, and history, review and rollback come for free. *Rejected:* Postgres/pgvector and hosted vector databases (operational cost and a network hop, with no benefit under A1).
 
-**ADR-003 · The contract is Markdown with required YAML frontmatter: `title`, `source` and `updated_at` are required; `url` and `tags` are optional; unknown keys are passed through.** *Why:* `updated_at` is the only reliable input for recency, because Git commit time is wrong after bulk re-exports and file mtime changes on checkout. `url` is the only way back to the original source. `title` and `source` could be derived, but requiring them keeps the contract explicit. Exporter-owned maintenance metadata such as `source_id` is allowed, as long as it doesn't change when the content doesn't: an `exported_at` stamp would change every document's hash, and rewrite its sidecar, on every export (A4). Engine-owned metadata lives in sidecars (ADR-005). *Rejected:* optional frontmatter with fallbacks (implicit behaviour that is hard to debug); no frontmatter (no reliable recency); native JSON sources (exporters render them to Markdown instead).
+**ADR-003 · (Amended by ADR-034, which adds optional `signals`.) The contract is Markdown with required YAML frontmatter: `title`, `source` and `updated_at` are required; `url` and `tags` are optional; unknown keys are passed through.** *Why:* `updated_at` is the only reliable input for recency, because Git commit time is wrong after bulk re-exports and file mtime changes on checkout. `url` is the only way back to the original source. `title` and `source` could be derived, but requiring them keeps the contract explicit. Exporter-owned maintenance metadata such as `source_id` is allowed, as long as it doesn't change when the content doesn't: an `exported_at` stamp would change every document's hash, and rewrite its sidecar, on every export (A4). Engine-owned metadata lives in sidecars (ADR-005). *Rejected:* optional frontmatter with fallbacks (implicit behaviour that is hard to debug); no frontmatter (no reliable recency); native JSON sources (exporters render them to Markdown instead).
 
 **ADR-004 · A document's identity is its path relative to the knowledge base root.** *Why:* overwriting a file updates the document and deleting it removes the document. Staleness is handled without a separate registry. *Rejected:* an ID field in frontmatter (two sources of identity that can drift apart).
 
@@ -193,13 +195,13 @@ Each record: **Decision**, then **Why**, then **Rejected** options. Superseded r
 
 **ADR-011 · Chunking is a pluggable write-time strategy that produces recorded chunks. The structure-aware splitter is always available: it splits on headings, then block boundaries, never splits code blocks, prefixes a breadcrumb capped at ~25% of the chunk, and caps chunk size (~1,000 characters target, ~2,000 maximum; the target is tuned in eval). Chunks never overlap.** *Why:* structure-aware splitting is the strong baseline for Markdown. Published comparisons show inconsistent gains from semantic chunking over it. A heading is a hard boundary regardless of the resulting chunk's size, because it marks a deliberate new piece of information, not a size threshold to reach — small heading-delimited sections stay their own chunk rather than being packed with their neighbours. Content with no heading at all (or the run of blocks before the first heading) has no such boundary, so it is packed by size alone, the same rule used within any single heading's section. The character cap only keeps chunks within the reranker's input window. Zero overlap and query-time neighbour expansion (ADR-013) go together: overlap would pay at write time, in duplicated text and vectors for every chunk, for context that expansion supplies only when a query asks for it. Without overlap, adjacent chunks also join cleanly. Onyx makes the same pairing (`CHUNK_OVERLAP=0`, "unclear if overlaps actually help"). The breadcrumb cap stops deep headings from crowding out content, following Onyx's 25% limit on metadata. *Supersedes:* the v3 decision that the chunker must be deterministic because the server re-chunks at startup. *Rejected:* fixed-size windows (split code blocks and sections apart); merging small heading-delimited sections together to hit the size target (loses the heading as a semantic signal; cross-section retrieval misses are handled at query time instead, see ADR-028).
 
-**ADR-012 · Recency is blended after reranking: `final = (1−w)·σ(rerank) + w·0.5^(age/half_life)`.** *Why:* any score applied before the reranker is thrown away by it. Recency should break ties, never replace relevance. Because the blend is additive, an old document can lose at most `w` (15% by default), so it never decays to zero. That is the same property as Onyx's multiplicative recency floor of 0.75. *Rejected:* decay inside retrieval; unbounded multiplicative decay.
+**ADR-012 · (Generalised to weighted signals by ADR-034.) Recency is blended after reranking: `final = (1−w)·σ(rerank) + w·0.5^(age/half_life)`.** *Why:* any score applied before the reranker is thrown away by it. Recency should break ties, never replace relevance. Because the blend is additive, an old document can lose at most `w` (15% by default), so it never decays to zero. That is the same property as Onyx's multiplicative recency floor of 0.75. *Rejected:* decay inside retrieval; unbounded multiplicative decay.
 
-**ADR-013 · These settings have configured defaults and can be overridden per request: search `mode` (`hybrid` by default, or `keyword` or `semantic`), result count (default 3, max 10), minimum score, recency weight, neighbour `expand` (default 0, max 2 chunks on each side) and filters. Results are always capped at 2 chunks per document, and adjacent hits from one document are merged into a single result.** *Why:* different callers want different precision/recall trade-offs, and returning no result is better than padding the agent's context with noise. `keyword` mode lets an agent force exact matching for identifiers, following Grapevine's separate keyword and semantic tools, without giving up fused hybrid search as the default. Expansion supplies surrounding context only when it's asked for (Onyx expands 1 chunk above and below by default). *Rejected:* a fixed top 3; config-only settings; separate keyword and semantic endpoints (a mode parameter is enough).
+**ADR-013 · (The recency weight becomes signal weights under ADR-034; filters are the shared filter of ADR-035.) These settings have configured defaults and can be overridden per request: search `mode` (`hybrid` by default, or `keyword` or `semantic`), result count (default 3, max 10), minimum score, recency weight, neighbour `expand` (default 0, max 2 chunks on each side) and filters. Results are always capped at 2 chunks per document, and adjacent hits from one document are merged into a single result.** *Why:* different callers want different precision/recall trade-offs, and returning no result is better than padding the agent's context with noise. `keyword` mode lets an agent force exact matching for identifiers, following Grapevine's separate keyword and semantic tools, without giving up fused hybrid search as the default. Expansion supplies surrounding context only when it's asked for (Onyx expands 1 chunk above and below by default). *Rejected:* a fixed top 3; config-only settings; separate keyword and semantic endpoints (a mode parameter is enough).
 
 **ADR-014 · The PoC interface is a library API, HTTP JSON on `node:http`, and a CLI, plus an agent setup doc. MCP is deferred.** *Why:* the library is the basic layer that advanced layers compose on. HTTP and the CLI are enough for agents, given a setup prompt. An MCP adapter is a thin wrapper that can be added later. *Rejected:* MCP in the PoC; Fastify or Express (unneeded dependencies).
 
-**ADR-015 · There are two operations: `search` and `getDocument`.** *Why:* snippets stay short, and callers can expand a result on demand. *Rejected:* a single `get_context`; one operation per source.
+**ADR-015 · (Superseded by ADR-035.) There are two operations: `search` and `getDocument`.** *Why:* snippets stay short, and callers can expand a result on demand. *Rejected:* a single `get_context`; one operation per source.
 
 **ADR-016 · There is no auth or ACL inside the engine: one deployment per audience.** *Why:* access control is an integration concern that belongs at the ingress (A3). *Supersedes:* the v3 optional bearer token. *Rejected:* per-document ACL filtering.
 
@@ -236,3 +238,35 @@ Each record: **Decision**, then **Why**, then **Rejected** options. Superseded r
 **ADR-032 · Configuration comes only from explicit inputs: built-in defaults, overridden by the caller's CLI flags or by the object passed to `createEngine`. One zod schema validates the result. There is no config file, and the engine reads no environment variables. The embedding model is not configurable: `embed` always uses the engine's embedding preset and re-embeds any sidecar recorded with another model, and `check`, `search` and `serve` use the one model the sidecars record.** *Why:* every input is then either a versioned public interface (the CLI flags and the library schema, released with the package) or data the engine generated itself (the sidecars). There is no hand-edited file whose schema the engine would have to keep reading, and migrating, across releases. Environment variables would add hidden, machine-local state that makes the same command behave differently in CI, on a laptop and on a server. The one setting that `embed` and the read path must agree on is the embedding model, and ADR-005 already records it in every sidecar. Reading it from there makes disagreement impossible rather than something to detect. Settings that matter to only one command, such as the chunk size target for `embed` or the port and retrieval defaults for `serve`, are flags. Integrators keep their invocations in their own scripts or CI, and map environment variables themselves, for example `md-rag serve --port "$PORT"`. *Rejected:* `MDRAG_*` environment variables; a config file inside `.md-rag/` (a hand-edited file in the engine-owned folder, whose users' copies break when its schema changes, ADR-031); a config file in the knowledge base root (another user-facing schema to version, and clutter in the tree exporters own, for no need once the model comes from the sidecars); a configured model checked against the sidecars (two sources of truth for one fact); an `embed --model` flag (the PoC has a single embedding preset, so there is nothing to switch to).
 
 **ADR-033 · Sidecar vectors are base64-encoded little-endian float16, and are widened to float32 when the index is built.** *Why:* sidecars are committed, so a knowledge base that is re-exported regularly grows its repository with every changed chunk (A7). Float16 halves float32 to 768 bytes (1,024 base64 characters) per 384-dimension vector, and the precision loss is negligible for L2-normalised vectors compared by cosine similarity. The encoding is decided before the first sidecar is written, because changing it later is a `format` bump that rewrites every sidecar in one commit. Widening at load keeps RAM use and search unchanged. *Amends:* ADR-005. *Rejected:* float32 (twice the growth, with no measurable gain); JSON number arrays (several times larger again); int8 with a per-vector scale (about half the size of float16 again, but with a quality cost that needs eval, §3).
+
+**ADR-034 · Ranking signals: the recency blend (ADR-012) becomes a bounded blend of weighted signals, `final = (1 − Σwᵢ)·σ(rerank) + Σ wᵢ·sᵢ`, where every signal sᵢ is in [0, 1].** Rules:
+
+- `recency` is built in: `0.5^(age/half_life)`, from `updated_at`.
+- Documents declare any other signal in an optional `signals` frontmatter map of names to numbers in [0, 1], for example `signals: { authority: 0.8, reviewed: 1 }`. Names are lower-case identifiers, and `recency` is reserved. A document that doesn't declare a signal scores 0 for it.
+- Weights have configured defaults (`weights` in `createEngine`, `--weight name=value` on `serve`) that each request can override. Each weight is in [0, 1] and together they sum to at most 0.5. A weight for a signal that no document declares is a validation error.
+
+*Why:* consumers need ranking inputs that only they can know, such as a source's authority, a document's review status or a curated priority, and the engine shouldn't invent them. The engine provides the mechanism and the consumer provides the policy: exporters write the values, and deployments and requests choose the weights. Generalising the existing blend keeps its guarantee that signals can never override relevance entirely: a result gains or loses at most Σwᵢ, and the 0.5 cap keeps relevance the larger share (the cap is revisited in eval). Signals are applied after reranking, like recency, so they reorder relevant candidates and never pull in irrelevant ones. An explicit `signals` map, rather than arbitrary numeric keys, keeps the ranker's inputs separate from exporter-owned metadata. Rejecting weights for undeclared signals turns a typo into an error instead of a silent no-op, and `overview` lists the declared signals (ADR-035). A missing value of 0 is predictable, and an exporter that wants a neutral value writes one. *Amends:* ADR-003 (adds `signals`), ADR-012 and ADR-013 (the recency weight becomes `weights.recency`). *Rejected:* authority fixed per `source` inside the engine (policy in the mechanism); multiplicative boosts (unbounded, so one signal could suppress a relevant result); signals applied before reranking (the reranker discards them, ADR-012); any numeric frontmatter key as a signal (ties the ranker to exporter-owned keys and hides typos); negative weights (an exporter expresses a penalty by inverting the value).
+
+**ADR-035 · The engine offers four operations that share one filter and one document summary. Supersedes ADR-015.**
+
+| Operation | Library | HTTP | CLI | Returns |
+| --- | --- | --- | --- | --- |
+| Overview | `overview(filter?)` | `GET /overview` | `md-rag overview` | Document and chunk counts, the index version and embedding model, and every source, tag and declared signal with its document count, all within the filter |
+| Search | `search(request)` | `POST /search` | `md-rag search` | Ranked, cited results (ADR-013, ADR-036) |
+| List | `listDocuments({ filter, sort, limit, offset })` | `GET /documents` | `md-rag list` | Matching document summaries, unranked, sorted by `path` (the default) or by `updated_at` newest first, with the total count |
+| Get | `getDocument(ref, { body })` | `GET /documents/{ref}` | `md-rag get` | One document's summary and outline (headings with anchor and depth), plus the body of the document or of the section the `ref` names, unless `body` is false |
+
+- The **filter** is `{ sources, tags, tags_any, dir, updated_after }`. A document matches if its source is any of `sources`, it has all of `tags` and at least one of `tags_any`, it lies under the directory `dir`, and it was updated after `updated_after`. Omitted fields don't constrain.
+- The **document summary** is `{ ref, path, title, source, tags, updated_at, url, signals, meta }`, where `meta` holds the pass-through frontmatter keys (ADR-003). Search results extend it, and every `ref` is accepted by `getDocument`.
+
+*Why:* many of the questions consumers ask aren't ranked searches. "Which squads exist?", "what changed in the runbooks this week?" and "what does the gateway squad's page say?" are enumeration and lookup, and a ranked top 10 answers them unreliably. The engine already holds every document's metadata in memory, so answering them is cheap and deterministic. The operations are designed as one loop: orient with `overview`, which shows the real sources, tags and signals, so callers build filters from actual values rather than guesses; narrow with the same filter on `search` or `listDocuments`; then read with `getDocument`. The outline lets an agent that found the right document but the wrong section open the section it needs without reading the whole body (the step 3.1 case). Reads with `body: false` return the frontmatter that consumers use to model their own entities (for example owners, channels and projects in `meta`), and the engine stays ignorant of what those entities are. Tags are the filterable vocabulary: a consumer that wants to enumerate by an attribute puts it in a tag, such as `squad:gateway`, and `overview` lists every value. All three interfaces expose all four operations, because an agent on the CLI needs to read documents as much as one on HTTP. The result set of a listing is fixed for a given index version, so offsets are stable. *Rejected:* filtering on arbitrary frontmatter keys (each key would need indexing and a type, and exporter-owned keys are not a stable schema; tags already carry filterable attributes); a query language (a fixed filter covers the needs and is easy for agents to write); entity-aware operations such as "list squads" (the engine would learn one consumer's model); a search with an empty query as the listing (ranked, capped at 10 results and not exhaustive); cursor pagination (unneeded while listings are stable per index version); `getDocument` without an outline (the caller has to read the whole body to find a section).
+
+**ADR-036 · Search results show how they were scored.** Each result carries the document summary (ADR-035), the chunk's `ref` and breadcrumb, and `scores`:
+
+- `retrieval`: the Orama candidate score
+- `rerank`: the raw cross-encoder score, or null when reranking is off
+- `relevance`: σ(rerank), or the retrieval score normalised to [0, 1] when reranking is off
+- `signals`: each weighted signal's value, recency included
+- `final`: the blended score (ADR-034)
+
+A merged result reports the scores of its best chunk. The response also carries per-stage timings and the index version. *Why:* layers built on the engine need to know why a result ranked where it did: to attribute results to their own entities through tags and `meta`, to attribute quality to stages in eval, and to decide when to fall back or search again. Only the engine sees the intermediate scores, so no caller can recompute them. The scores are relative, not calibrated probabilities: retrieval scores aren't comparable across modes, and thresholds on any of them are tuned in eval. *Rejected:* only the final score (a caller can't tell a weak match from a strong match pulled down by its age); scores for every chunk of a merged result (bigger responses for little use).
