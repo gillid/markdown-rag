@@ -40,9 +40,9 @@ Status: `planned` · `in-progress` · `done`
 
 ## Milestone 2: Content model
 
-### 5. Knowledge base loader and document contract · `planned`
+### 5. Knowledge base loader and document contract · `done`
 
-- `loadKnowledgeBase(sourceDir)` walks `**/*.md`, skipping dot-directories (including the default `.md-rag/`, ADR-031) and `targetDir` when it lies inside `sourceDir` under another name (ADR-037).
+- `loadKnowledgeBase(config)` takes the resolved `Config` (step 4) and walks `config.sourceDir` for `**/*.md`, skipping dot-directories (including the default `.md-rag/`, ADR-031) and `config.targetDir` when it lies inside `sourceDir` under another name (ADR-037). Documents load in parallel; one failing document doesn't block the rest.
 - Line endings are normalised to LF. `doc_hash` = `sha256` of the normalised file (ADR-005).
 - The document is parsed once with `mdast-util-from-markdown` plus `mdast-util-frontmatter`. The YAML node is read with `yaml` and validated with zod: `title`, `source` and `updated_at` are required; `url`, `tags` and `signals` are optional; unknown keys are kept as `meta` (ADR-003, ADR-023). `signals` maps lower-case identifiers other than `recency` to numbers in [0, 1] (ADR-034).
 - Errors are collected across all files and reported together (path plus reason). Enforces the 1 MB size limit.
