@@ -35,7 +35,8 @@ Before reporting work as done, run `pnpm lint:fix`, `pnpm typecheck` and `pnpm t
 - **Every behaviour change is checked against its ADR.** If a change contradicts a decision in `docs/design.md` §4, update or supersede that ADR in the same PR.
 - **One step, one PR.** Work follows `docs/implementation.md`. Set the step's status (`planned` → `in-progress` → `done`) in the same PR.
 - **Sidecars are the contract between the write path and the read path.** A sidecar is fresh if and only if its `doc_hash` matches its document and its embedding model matches the one all sidecars share. Sidecar output must be byte-stable. Stale sidecars must fail fast and must never be patched over at runtime.
-- **Engine-owned files live only in `targetDir`** (default `<sourceDir>/.md-rag/`: sidecars, git-ignored model cache). Every file in it is generated; never add a hand-edited one, and never write anywhere else in a knowledge base (ADR-031, ADR-037).
+- **Engine-owned files live only in `targetDir`** (default `<sourceDir>/.md-rag/`: sidecars and model cache). Every file in it is generated; never add a hand-edited one, and never write anywhere else in a knowledge base (ADR-031, ADR-037).
+- **Sidecars are never committed.** The whole engine folder is git-ignored, and `md-rag embed` regenerates it before serving; tests generate sidecars into a temporary `targetDir` (ADR-038).
 - **No environment variables.** Configuration arrives only through CLI flags or the object passed to `createEngine`; there is no config file. The embedding model comes from the sidecars (ADR-032).
 - **Neither path makes network calls.** The only network access is downloading model weights into the cache.
 - **The library API is the extension point.** Advanced layers compose on `createEngine()`. Don't add plugin or hook systems.
