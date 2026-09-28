@@ -23,6 +23,7 @@ Checklist for automated and human PR review of md-rag. Rules here are drawn from
 
 - **No environment variables.** Configuration must arrive only through CLI flags or the object passed to `createEngine` — flag any new `process.env` read in engine code (ADR-032).
 - **No network calls on the query or write path** beyond downloading model weights into the cache (ADR-019, ADR-022).
+- **HTTP stays on `node:http`, no framework.** The HTTP layer is a thin wrapper over the library with no unneeded dependency added for routing or middleware (ADR-014).
 - **No plugin/hook systems.** The library API (`createEngine()`) is the sole extension point; flag any new plugin, hook, or middleware mechanism (per "The library API is the extension point" in `CLAUDE.md`).
 - **Embedding model is not configurable outside sidecars.** `embed` always uses the engine's preset; `check`/`search`/`serve` must read the model from the sidecars, never a flag or config value (ADR-032).
 

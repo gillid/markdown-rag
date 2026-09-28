@@ -49,6 +49,7 @@ Before reporting work as done, run `pnpm lint:fix`, `pnpm typecheck` and `pnpm t
 | --- | --- |
 | Idea, PoC scope, what's deferred, ADR log | `docs/design.md` |
 | Step-by-step PoC plan with statuses | `docs/implementation.md` |
+| PR review checklist (used by the automated review routine) | `REVIEW.md` |
 | Document contract and sidecar format (for exporters) | `docs/contract.md` (planned, step 24) |
 | Agent setup prompt | `docs/agent-setup.md` (planned, step 20) |
 | Benchmark and chunker comparison | `docs/benchmarks.md` (planned, steps 22–23) |
