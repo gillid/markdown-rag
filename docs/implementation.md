@@ -49,7 +49,7 @@ Status: `planned` · `in-progress` · `done`
 - Returns documents containing `path` (POSIX, relative to `sourceDir`), `docHash`, the parsed tree, the body, and typed metadata (`updated_at` as epoch milliseconds).
 - **Tests:** valid and invalid fixtures, including out-of-range and reserved signal names; CRLF and LF versions of a file give the same hash.
 
-### 6. `md-rag check` (contract only) · `in-progress`
+### 6. `md-rag check` (contract only) · `done`
 
 - A CLI command that runs the loader and exits non-zero with the aggregated errors. Sidecar freshness is added in step 12.
 
