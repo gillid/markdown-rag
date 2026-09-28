@@ -32,20 +32,21 @@ Status: `planned` · `in-progress` · `done`
 
 - Add a team/service-directory style document to `examples/docs/` with separate heading sections (e.g. mission, owned services, contacts) where a realistic question's answer lives in a different section than the one that best matches semantically. Tests cross-section retrieval and whether `expand` or `getDocument` is needed to recover the fact (see the note on step 8's heading-boundary rule, and the eval query in step 21).
 
-### 4. Config module · `planned`
+### 4. Config module · `done`
 
-- A single `loadConfig({ root, overrides })` merges built-in defaults with the caller's overrides (CLI flags, or the object passed to `createEngine`). One zod schema validates the result. There's no config file, and it reads no environment variables (ADR-032).
-- It starts with the knowledge base directory only (`--root`, defaulting to the current directory). Every later step adds the fields it needs. No placeholder fields.
+- A single `loadConfig(input)` validates the caller's input (CLI flags, or the object passed to `createEngine`) against one zod schema, which fills in built-in defaults for the fields that have them. There's no config file, and it reads no environment variables (ADR-032).
+- It starts with the two directories only (ADR-037). `sourceDir` (`--source-dir`) is the knowledge base, is required and has no default, so nothing depends on where the process was started. `targetDir` (`--target-dir`) is the engine folder and defaults to `<sourceDir>/.md-rag/`. Relative paths resolve against the current directory, and a `targetDir` that is `sourceDir` or one of its parents is rejected. Every later step adds the fields it needs. No placeholder fields.
+- The input type marks required fields; optional fields always get a default, so the resolved config is complete.
 
 ## Milestone 2: Content model
 
 ### 5. Knowledge base loader and document contract · `planned`
 
-- `loadKnowledgeBase(root)` walks `**/*.md`, skipping dot-directories (including the engine's `.md-rag/`, ADR-031).
+- `loadKnowledgeBase(sourceDir)` walks `**/*.md`, skipping dot-directories (including the default `.md-rag/`, ADR-031) and `targetDir` when it lies inside `sourceDir` under another name (ADR-037).
 - Line endings are normalised to LF. `doc_hash` = `sha256` of the normalised file (ADR-005).
 - The document is parsed once with `mdast-util-from-markdown` plus `mdast-util-frontmatter`. The YAML node is read with `yaml` and validated with zod: `title`, `source` and `updated_at` are required; `url`, `tags` and `signals` are optional; unknown keys are kept as `meta` (ADR-003, ADR-023). `signals` maps lower-case identifiers other than `recency` to numbers in [0, 1] (ADR-034).
 - Errors are collected across all files and reported together (path plus reason). Enforces the 1 MB size limit.
-- Returns documents containing `path` (POSIX, relative to the root), `docHash`, the parsed tree, the body, and typed metadata (`updated_at` as epoch milliseconds).
+- Returns documents containing `path` (POSIX, relative to `sourceDir`), `docHash`, the parsed tree, the body, and typed metadata (`updated_at` as epoch milliseconds).
 - **Tests:** valid and invalid fixtures, including out-of-range and reserved signal names; CRLF and LF versions of a file give the same hash.
 
 ### 6. `md-rag check` (contract only) · `planned`
@@ -54,7 +55,7 @@ Status: `planned` · `in-progress` · `done`
 
 ### 7. Sidecar format · `planned`
 
-- Read and write `.md-rag/vectors/<doc-path>.vec.json` with the fields `{ format: 1, doc_hash, chunker, model, dims, chunks: [{ start, end, breadcrumb, anchor, hash, vector }] }` (ADR-005, ADR-031).
+- Read and write `<targetDir>/vectors/<doc-path>.vec.json` with the fields `{ format: 1, doc_hash, chunker, model, dims, chunks: [{ start, end, breadcrumb, anchor, hash, vector }] }` (ADR-005, ADR-031).
 - `start` and `end` are offsets into the normalised body. `hash` = `sha256(breadcrumb + "\n" + text)`. `vector` is base64-encoded little-endian float16, widened to float32 when read (ADR-033).
 - The output is written deterministically (stable key order, trailing newline), so unchanged input produces a byte-identical file.
 - **Tests:** round trip (within float16 precision), a byte-exact literal fixture, and offsets resolving back to the expected text.
@@ -79,9 +80,9 @@ Status: `planned` · `in-progress` · `done`
 ### 10. Embedder · `planned`
 
 - An `Embedder` interface (`embedDocuments`, `embedQuery`, `modelId`, `dims`) and a transformers.js implementation: `feature-extraction` with mean pooling and normalisation, q8 weights, and a pinned model revision (ADR-009, ADR-010).
-- Config covers the model cache directory (`modelsDir`, default `<root>/.md-rag/models/`, overridable with `--models-dir`) and whether remote models are allowed (ADR-022, ADR-031). Both are passed to transformers.js explicitly, never through environment variables (ADR-032). The model loads lazily, once. The BGE query instruction prefix is applied only to queries.
+- Config covers the model cache directory (`modelsDir`, default `<targetDir>/models/`, overridable with `--models-dir`) and whether remote models are allowed (ADR-022, ADR-031). Several knowledge bases in one repository each have their own `targetDir`, so they share one cache by passing the same `--models-dir` (ADR-037). Both are passed to transformers.js explicitly, never through environment variables (ADR-032). The model loads lazily, once. The BGE query instruction prefix is applied only to queries.
 - Model presets map a model ID (the value recorded in sidecars) to its Hugging Face repository, pinned revision, dimensions and query prefix. The PoC has one embedding preset, `bge-small-en-v1.5` (ADR-010).
-- A shared `ensureEngineDir(root)` creates `.md-rag/` and writes `.md-rag/.gitignore` (ignoring `models/`) with its canonical content, overwriting any edits, since nothing in `.md-rag/` is hand-edited (ADR-031). Model loading calls it before anything is downloaded into the default cache, and step 11 reuses it.
+- A shared `ensureEngineDir(targetDir)` creates `targetDir` and writes `<targetDir>/.gitignore` (ignoring `models/`) with its canonical content, overwriting any edits, since nothing in `targetDir` is hand-edited (ADR-031). Model loading calls it before anything is downloaded into the default cache, and step 11 reuses it.
 - **Tests:** a `*.models.test.ts` checks that a paraphrase pair outscores an unrelated pair, and that vectors have 384 dimensions and are L2-normalised.
 
 ### 11. `md-rag embed` · `planned`
@@ -89,16 +90,16 @@ Status: `planned` · `in-progress` · `done`
 - For each document whose `doc_hash` differs from its sidecar (or that has no sidecar, or with `--rechunk`):
   - chunk it with the configured chunker
   - reuse vectors from the old sidecar where a chunk hash matches, and embed the rest
-  - write the sidecar to `.md-rag/vectors/`, creating the folder through `ensureEngineDir` on first run (ADR-031)
+  - write the sidecar to `<targetDir>/vectors/`, creating the folder through `ensureEngineDir` on first run (ADR-031)
 - `embed` always uses the engine's embedding preset (step 10). A sidecar recorded with a different model has its recorded chunks re-embedded, without re-chunking (ADR-032). A chunker change alone invalidates nothing (ADR-024).
 - Deletes sidecars that no longer have a matching document. Prints a summary (documents processed, chunks embedded or reused, failures).
 - Embeds in batches across documents. If a batch fails, it retries that batch one document at a time, reports the documents that failed, leaves their sidecars untouched and exits non-zero, while all other documents are still written. This follows Onyx's `embed_chunks_with_failure_handling`.
-- **Tests:** use a counting fake embedder and a fake chunker. Editing one document processes only that document and re-embeds only its changed chunks. Deleting a document prunes its sidecar. A sidecar recorded with a different model is re-embedded without re-chunking. When the embedder fails on one document, only that document is reported and every other sidecar is still written. The first run on a fresh knowledge base creates `.md-rag/.gitignore`, and an edited one is restored to its canonical content.
+- **Tests:** use a counting fake embedder and a fake chunker. Editing one document processes only that document and re-embeds only its changed chunks. Deleting a document prunes its sidecar. A sidecar recorded with a different model is re-embedded without re-chunking. When the embedder fails on one document, only that document is reported and every other sidecar is still written. The first run on a fresh knowledge base creates `<targetDir>/.gitignore`, and an edited one is restored to its canonical content.
 - Commit `examples/docs/.md-rag/` (the sidecars generated with the splitter, plus its `.gitignore`).
 
 ### 12. Sidecar freshness in `md-rag check` · `planned`
 
-- A shared `checkFreshness(storage, sidecars)` reports documents with a missing sidecar or a `doc_hash` mismatch, orphaned sidecars, and sidecars whose recorded model differs from the rest. On success it returns the one model ID they share, which the read path loads (ADR-006, ADR-032). A model ID the engine has no preset for (step 10) is also an error. It loads no model and makes no LLM call. `md-rag check` and the index (step 13) both use it. When `.md-rag/vectors/` doesn't exist yet, the error says to run `md-rag embed` first (ADR-031).
+- A shared `checkFreshness(storage, sidecars)` reports documents with a missing sidecar or a `doc_hash` mismatch, orphaned sidecars, and sidecars whose recorded model differs from the rest. On success it returns the one model ID they share, which the read path loads (ADR-006, ADR-032). A model ID the engine has no preset for (step 10) is also an error. It loads no model and makes no LLM call. `md-rag check` and the index (step 13) both use it. Orphaned sidecars also catch two knowledge bases sharing one `targetDir` (ADR-037). When `<targetDir>/vectors/` doesn't exist yet, the error names the directory it looked in and says to run `md-rag embed` first, or to pass the `--target-dir` that `embed` used (ADR-031, ADR-037).
 
 ## Milestone 5: Read path
 
@@ -133,7 +134,7 @@ Status: `planned` · `in-progress` · `done`
 
 ### 17. Library API · `planned`
 
-- `createEngine(config)` takes `{ root, ...overrides }`, resolves them through `loadConfig` (step 4, ADR-032) and returns `{ overview(filter), search(request), listDocuments(request), getDocument(ref, options), ready(), version }`. This is the basic layer, and advanced layers compose on it (ADR-014, ADR-035).
+- `createEngine(config)` takes `{ sourceDir, targetDir?, ...overrides }`, resolves them through `loadConfig` (step 4, ADR-032) and returns `{ overview(filter), search(request), listDocuments(request), getDocument(ref, options), ready(), version }`. This is the basic layer, and advanced layers compose on it (ADR-014, ADR-035).
 - zod schemas are exported for `Filter`, `DocumentSummary`, `Overview`, `SearchRequest`, `SearchResult`, `ListRequest`, `DocumentList` and `Document`. Every operation takes the same `Filter`, and summaries, search results and documents share the `DocumentSummary` fields (ADR-035).
 - `overview(filter)` returns the document and chunk counts, `index_version`, the embedding model, and `sources`, `tags` and `signals` as `{ name, documents }` lists sorted by name, all counted within the filter.
 - `listDocuments({ filter, sort, limit, offset })` returns `{ total, documents, index_version }`. `sort` is `path` (default) or `updated_at` (newest first, ties by path); `limit` defaults to 50, with a maximum of 500.
