@@ -19,7 +19,7 @@ Keep this list in sync with `package.json`.
 | Command | Purpose |
 | --- | --- |
 | `pnpm install` | Install dependencies |
-| `pnpm md-rag <cmd>` | Run the CLI: `embed`, `check`, `search`, `serve`, `eval` |
+| `pnpm md-rag <cmd>` | Run the CLI: `embed`, `check`, `overview`, `search`, `list`, `get`, `serve`, `eval` |
 | `pnpm start` | `md-rag serve` (HTTP API) with the configured storage |
 | `pnpm lint` / `pnpm lint:fix` | Biome check / apply fixes and formatting |
 | `pnpm typecheck` | `tsc --noEmit` |

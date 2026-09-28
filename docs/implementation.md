@@ -43,10 +43,10 @@ Status: `planned` · `in-progress` · `done`
 
 - `loadKnowledgeBase(root)` walks `**/*.md`, skipping dot-directories (including the engine's `.md-rag/`, ADR-031).
 - Line endings are normalised to LF. `doc_hash` = `sha256` of the normalised file (ADR-005).
-- The document is parsed once with `mdast-util-from-markdown` plus `mdast-util-frontmatter`. The YAML node is read with `yaml` and validated with zod: `title`, `source` and `updated_at` are required; `url` and `tags` are optional; unknown keys are kept as `meta` (ADR-003, ADR-023).
+- The document is parsed once with `mdast-util-from-markdown` plus `mdast-util-frontmatter`. The YAML node is read with `yaml` and validated with zod: `title`, `source` and `updated_at` are required; `url`, `tags` and `signals` are optional; unknown keys are kept as `meta` (ADR-003, ADR-023). `signals` maps lower-case identifiers other than `recency` to numbers in [0, 1] (ADR-034).
 - Errors are collected across all files and reported together (path plus reason). Enforces the 1 MB size limit.
 - Returns documents containing `path` (POSIX, relative to the root), `docHash`, the parsed tree, the body, and typed metadata (`updated_at` as epoch milliseconds).
-- **Tests:** valid and invalid fixtures; CRLF and LF versions of a file give the same hash.
+- **Tests:** valid and invalid fixtures, including out-of-range and reserved signal names; CRLF and LF versions of a file give the same hash.
 
 ### 6. `md-rag check` (contract only) · `planned`
 
@@ -55,9 +55,9 @@ Status: `planned` · `in-progress` · `done`
 ### 7. Sidecar format · `planned`
 
 - Read and write `.md-rag/vectors/<doc-path>.vec.json` with the fields `{ format: 1, doc_hash, chunker, model, dims, chunks: [{ start, end, breadcrumb, anchor, hash, vector }] }` (ADR-005, ADR-031).
-- `start` and `end` are offsets into the normalised body. `hash` = `sha256(breadcrumb + "\n" + text)`. `vector` is base64-encoded little-endian float32.
+- `start` and `end` are offsets into the normalised body. `hash` = `sha256(breadcrumb + "\n" + text)`. `vector` is base64-encoded little-endian float16, widened to float32 when read (ADR-033).
 - The output is written deterministically (stable key order, trailing newline), so unchanged input produces a byte-identical file.
-- **Tests:** round trip, a byte-exact literal fixture, and offsets resolving back to the expected text.
+- **Tests:** round trip (within float16 precision), a byte-exact literal fixture, and offsets resolving back to the expected text.
 
 ## Milestone 3: Chunking
 
@@ -104,14 +104,14 @@ Status: `planned` · `in-progress` · `done`
 
 ### 13. In-memory index · `planned`
 
-- `buildIndex(storage, sidecars)` fails fast using `checkFreshness`. It then inserts every recorded chunk into an Orama schema with `path`, `ordinal` (the chunk's position within its document), `title`, `breadcrumb`, `text` (sliced from the body by offsets), `source` (enum), `tags` (enum[]), `updated_at` (number), `url`, `anchor` and `embedding` (a vector sized to the shared model's `dims`, 384 for the default) (ADR-007, ADR-008).
-- Also keeps a lookup of each document's ordered chunks, which step 16 uses for merging and neighbour expansion.
+- `buildIndex(storage, sidecars)` fails fast using `checkFreshness`. It then inserts every recorded chunk into an Orama schema with `path`, `ordinal` (the chunk's position within its document), `title`, `breadcrumb`, `text` (sliced from the body by offsets), `source` (enum), `tags` (enum[]), `dirs` (enum[]: every ancestor directory of the path, for the `dir` filter), `updated_at` (number), `url`, `anchor` and `embedding` (a vector sized to the shared model's `dims`, 384 for the default) (ADR-007, ADR-008, ADR-035).
+- Also keeps a per-document lookup of its summary (ADR-035), signals, outline (headings with anchor and depth) and ordered chunks. Step 16 uses it for signals, merging and neighbour expansion, and step 17 for the unranked operations.
 - Records the index's `version`: the Git HEAD SHA of the knowledge base directory if available, otherwise a hash of all `doc_hash` values.
 - **Tests:** building from `examples/docs` succeeds, and a stale sidecar makes the build fail.
 
 ### 14. Hybrid candidate search · `planned`
 
-- `searchCandidates(index, { text, vector, k, mode, filters })` maps `mode` to Orama's hybrid, fulltext or vector search. Hybrid uses configurable `hybridWeights` (default 0.5/0.5). `title` gets a small boost (default 1.1, tuned in step 23), and English stopwords are applied through the language setting. Filters (`sources`, `tags`, `updated_after`) go through `where` (ADR-008, ADR-010, ADR-013).
+- `searchCandidates(index, { text, vector, k, mode, filter })` maps `mode` to Orama's hybrid, fulltext or vector search. Hybrid uses configurable `hybridWeights` (default 0.5/0.5). `title` gets a small boost (default 1.1, tuned in step 23), and English stopwords are applied through the language setting. The shared filter goes through `where`: `sources` any-of, `tags` all-of, `tags_any` any-of, `dir` against `dirs`, and `updated_after` (ADR-008, ADR-010, ADR-013, ADR-035). The same filter semantics are available as a plain predicate over document summaries for step 17's unranked operations, and tests check that both agree.
 - In `keyword` mode the query embedding is skipped.
 - **Tests:** an exact error-code query finds its document in `keyword` mode, and a paraphrase query finds its document in `semantic` mode (using stored sidecar vectors plus a fixed query vector, so no model is needed). Filters narrow results in every mode.
 
@@ -122,36 +122,46 @@ Status: `planned` · `in-progress` · `done`
 
 ### 16. Retrieval pipeline · `planned`
 
-- `retrieve(request)` runs these stages in order: embed the query (unless `mode` is `keyword`) → take K=30 candidates → cap at 2 chunks per document → rerank (unless disabled) → apply the recency blend → apply `min_score` → take the top `limit` → merge and expand (ADR-012, ADR-013, ADR-027).
+- `retrieve(request)` runs these stages in order: embed the query (unless `mode` is `keyword`) → take K=30 candidates → cap at 2 chunks per document → rerank (unless disabled) → apply the signal blend → apply `min_score` → take the top `limit` → merge and expand (ADR-012, ADR-013, ADR-027, ADR-034).
+- **Signal blend:** `final = (1 − Σwᵢ)·σ(rerank) + Σ wᵢ·sᵢ`, where `recency` is computed from `updated_at` and the other signals come from frontmatter, with 0 for a signal a document doesn't declare. Weights are validated: each in [0, 1], summing to at most 0.5, and only for `recency` or a signal some document declares (ADR-034).
 - **Merge and expand:** consecutive hits from the same document are merged into one result, which keeps the higher score. Each result is then extended with `expand` neighbouring chunks on each side from the per-document chunk lookup. Chunks never overlap, so they are joined without trimming (ADR-011).
-- Each request can override `mode`, `limit` (max 10), `min_score`, `recency_weight`, `expand` (max 2) and the filters. Config supplies the defaults, plus K, `half_life_days`, the hybrid weights and `rerank` (on or off).
-- Returns results with their score components and per-stage timings.
-- **Tests:** pure-function tests of the blend, the cutoff, merging (neighbouring and non-neighbouring hits) and expansion at document boundaries. With a fake embedder and reranker, the fresh document outranks the stale one, and with `recency_weight = 0` it does not.
+- Each request can override `mode`, `limit` (max 10), `min_score`, `weights`, `expand` (max 2) and the filter. Config supplies the defaults (`weights` defaults to `{ recency: 0.15 }`), plus K, `half_life_days`, the hybrid weights and `rerank` (on or off).
+- Returns results with their per-stage scores (`retrieval`, `rerank`, `relevance`, `signals`, `final`, ADR-036) and per-stage timings. A merged result keeps its best chunk's scores.
+- **Tests:** pure-function tests of the blend (against hand-computed values), weight validation, the cutoff, merging (neighbouring and non-neighbouring hits) and expansion at document boundaries. With a fake embedder and reranker, the fresh document outranks the stale one, and with `weights.recency = 0` it does not. With equal relevance, a document with a higher declared signal outranks one without it only while that signal has a weight.
 
 ## Milestone 6: Interface
 
 ### 17. Library API · `planned`
 
-- `createEngine(config)` takes `{ root, ...overrides }`, resolves them through `loadConfig` (step 4, ADR-032) and returns `{ search(request), getDocument(ref), ready(), version }`. zod schemas for `SearchRequest`, `SearchResult` and `Document` are exported. This is the basic layer, and advanced layers compose on it (ADR-014, ADR-015).
-- `getDocument(ref)` resolves `<path>` or `<path>#<anchor>` to the whole document or one section. Only indexed paths can be resolved, which blocks path traversal.
+- `createEngine(config)` takes `{ root, ...overrides }`, resolves them through `loadConfig` (step 4, ADR-032) and returns `{ overview(filter), search(request), listDocuments(request), getDocument(ref, options), ready(), version }`. This is the basic layer, and advanced layers compose on it (ADR-014, ADR-035).
+- zod schemas are exported for `Filter`, `DocumentSummary`, `Overview`, `SearchRequest`, `SearchResult`, `ListRequest`, `DocumentList` and `Document`. Every operation takes the same `Filter`, and summaries, search results and documents share the `DocumentSummary` fields (ADR-035).
+- `overview(filter)` returns the document and chunk counts, `index_version`, the embedding model, and `sources`, `tags` and `signals` as `{ name, documents }` lists sorted by name, all counted within the filter.
+- `listDocuments({ filter, sort, limit, offset })` returns `{ total, documents, index_version }`. `sort` is `path` (default) or `updated_at` (newest first, ties by path); `limit` defaults to 50, with a maximum of 500.
+- `getDocument(ref, { body })` resolves `<path>` or `<path>#<anchor>` and returns the summary, the document's outline and, unless `body` is false, the body of the document or of that section. Only indexed paths can be resolved, which blocks path traversal.
 - The package's `exports` expose only this API and its schemas. Step 19.1 publishes them.
-- **Tests:** an end-to-end search and `getDocument` against `examples/docs` using fakes.
+- **Tests:** against `examples/docs` using fakes: an end-to-end search; `overview` counts checked against hand-counted literals, with and without a filter; `listDocuments` filtering, both sorts and paging; `getDocument` for a whole document, a section and `body: false`.
 
-### 18. `md-rag search` CLI · `planned`
+### 18. Query CLI commands · `planned`
 
-- `md-rag search "<query>" [--mode --limit --min-score --expand --source --tag --since --json]` builds the engine and runs one query.
-- Markdown output: for each result, a heading built from the breadcrumb; a line with `source`, `updated` date, `url` and `ref`; then the snippet. It ends with `index_version`, or prints an explicit "no relevant context found" message when there are no results. `--json` prints the `SearchResult` schema instead.
-- **Tests:** snapshot tests of the Markdown renderer.
+- One command per operation, each building the engine and running it once (ADR-035). All of them accept the same filter flags (`--source`, `--tag`, `--tag-any`, `--dir`, `--since`, each repeatable where the filter takes a list), parsed by one shared helper, and `--json`, which prints the matching schema instead of Markdown.
+  - `md-rag overview`: counts, then the sources, tags and signals with their document counts.
+  - `md-rag search "<query>" [--mode --limit --min-score --expand --weight name=value]`: for each result, a heading built from the breadcrumb; a line with `source`, `updated` date, `url`, `ref` and the final score; then the snippet. It ends with `index_version`, or prints an explicit "no relevant context found" message when there are no results.
+  - `md-rag list [--sort --limit --offset]`: one line per document with `ref`, title, `source`, `updated` date and tags, followed by the total and the range shown.
+  - `md-rag get <ref> [--no-body]`: the summary as a header block, the outline, then the body.
+- **Tests:** snapshot tests of the Markdown renderers, and tests of the shared filter-flag parser.
 
 ### 19. HTTP API · `planned`
 
 - `createHttpHandler(engine)` is a plain `(req, res)` handler, so integrators can mount it or wrap it. It serves:
+  - `GET /overview`: the filter comes from query parameters
   - `POST /search`: the body is validated against `SearchRequest`, with 400 errors on invalid input
-  - `GET /documents/{ref}`
+  - `GET /documents`: `listDocuments`, with the filter, `sort`, `limit` and `offset` as query parameters (list fields repeat, e.g. `?tag=squad:gateway&tag=runbook`)
+  - `GET /documents/{ref}`: `getDocument`, with `?body=false` for a metadata and outline read
+- Query parameters map onto the shared `Filter` schema through one parser, so `GET /overview` and `GET /documents` validate filters exactly like `POST /search`.
   - `GET /healthz`: liveness, ready immediately
   - `GET /readyz`: ready only after the index is built, the models have loaded and a warm-up has run
 - `md-rag serve [--port]` runs it on `node:http` and shuts down gracefully on SIGTERM. Logs go to stderr. The port comes only from `--port`, never from a `PORT` environment variable (ADR-032).
-- **Tests:** health and readiness transitions, a validation error, and a search round trip.
+- **Tests:** health and readiness transitions, a validation error, a round trip for each operation, and query parameters producing the same filter as the equivalent JSON body.
 
 ### 19.1 Package distribution · `planned`
 
@@ -164,7 +174,9 @@ Status: `planned` · `in-progress` · `done`
 
 ### 20. Agent setup doc · `planned`
 
-- `docs/agent-setup.md` gives ready-to-paste instructions (a `CLAUDE.md` snippet or skill) that teach an agent when and how to call `md-rag search` (or `npx md-rag search` when it isn't installed) or `POST /search`. Every consumer of the package has the same interface, so the snippet doesn't need adapting per team (ADR-029). The style follows Grapevine's tool descriptions:
+- `docs/agent-setup.md` gives ready-to-paste instructions (a `CLAUDE.md` snippet or skill) that teach an agent when and how to call the four operations through the CLI (`md-rag overview`, `search`, `list` and `get`, or `npx md-rag …` when it isn't installed) or HTTP. Every consumer of the package has the same interface, so the snippet doesn't need adapting per team (ADR-029). The style follows Grapevine's tool descriptions:
+  - the orient, narrow and read loop: `overview` to learn the real sources and tags, the same filter on `search` or `list`, then `get` (with `--no-body` to see the outline first) (ADR-035)
+  - when to use `list` rather than `search`: enumerating or finding what changed recently, not answering a question
   - when to use `keyword` mode (identifiers, error codes) and when to use `hybrid` or `semantic`
   - 3–4 worked request examples, including filters and `expand`
   - the exact output format
@@ -194,10 +206,10 @@ Status: `planned` · `in-progress` · `done`
 - **Chunk size:** compare splitter targets of ~1,000 and ~2,000 characters. Onyx targets 512 tokens.
 - **Reranker:** compare with and without it (`--no-rerank`), and decide the default under ADR-027, weighing the quality gain against the rerank p95.
 - **Modes:** compare `hybrid`, `keyword` and `semantic`.
-- Tune the hybrid weights, title boost, K, `min_score` and `recency_weight`.
+- Tune the hybrid weights, title boost, K, `min_score`, `weights.recency` and the 0.5 cap on the summed signal weights (ADR-034).
 - Record everything in `docs/benchmarks.md`. Update the defaults and the relevant ADR entries if any values change. Confirm the PoC success criteria (design §2).
 
 ### 24. Integrator documentation · `planned`
 
 - `README.md` covers: what the project is, a no-install quick start (`npx md-rag embed`, `check`, `search` and `serve` against a local directory), installing it (`pnpm add md-rag`) for the library API, and the configuration reference (the CLI flags and the matching `createEngine` options, ADR-032).
-- `docs/contract.md` is the full frontmatter contract, the `.md-rag/` layout and the sidecar format, written for exporter authors.
+- `docs/contract.md` is the full frontmatter contract (including `signals`, ADR-034), the `.md-rag/` layout and the sidecar format, written for exporter authors. It spells out the exporter's obligations under A4: byte-identical output for unchanged content (no export timestamps in files), `updated_at` taken from the source's change time, and tags as the filterable vocabulary (ADR-035).
