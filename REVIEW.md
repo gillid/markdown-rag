@@ -42,6 +42,7 @@ Checklist for automated and human PR review of md-rag. Rules here are drawn from
 - **Comments:** only for a non-obvious WHY — a hidden constraint, a workaround, a surprising invariant. Flag comments that restate what the code does, or that reference the current PR/task/issue.
 - **Structure:** new code should prefer multiple small, focused files grouped by meaningful unit over one large file — but don't flag a file for not being split further than the task warrants, and don't flag refactors of existing files outside the PR's stated scope.
 - **Smells (Fowler):** duplicated code (extract the shared shape), feature envy (move the function onto the data it envies), primitive obsession (give the domain concept its own type), speculative generality (delete abstractions for needs that don't exist yet), shotgun surgery (gather what changes together into one module).
+- **No re-exports.** Don't re-export a symbol through a module that doesn't otherwise use it, including `export type { X }` added "for convenience" — flag any re-export with no consumer that actually imports through that path. Importers should reach for the symbol's owning module directly.
 
 ## Out of scope for this review
 
