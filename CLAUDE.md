@@ -4,7 +4,7 @@ An open-source engine that serves a Git repository of Markdown files to AI agent
 
 ## Tech Stack
 
-- **Runtime:** Node.js 24 LTS, ESM. TypeScript runs directly through native type stripping (no build step), with `tsc --noEmit` for type-checking only. Use erasable syntax only: no `enum`, no `namespace`, no parameter properties.
+- **Runtime:** Node.js 24 LTS, ESM. TypeScript runs directly through native type stripping (no build step), with `tsc --noEmit` for type-checking only. Use erasable syntax only: no `enum`, no `namespace`, no parameter properties. Sidecar vectors use Node 24's native `DataView` float16 methods (ADR-033), so the `tsconfig.json` `lib` includes `ESNext.Float16`.
 - **Package manager:** pnpm
 - **Search:** `@orama/orama` (in-process hybrid index)
 - **Query-path models (local):** `@huggingface/transformers` on `onnxruntime-node`. The embedder is `Xenova/bge-small-en-v1.5` and the reranker is `Xenova/ms-marco-MiniLM-L-6-v2` (q8).

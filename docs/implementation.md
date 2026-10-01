@@ -53,11 +53,12 @@ Status: `planned` · `in-progress` · `done`
 
 - A CLI command that runs the loader and exits non-zero with the aggregated errors. Sidecar freshness is added in step 12.
 
-### 7. Sidecar format · `planned`
+### 7. Sidecar format · `done`
 
 - Read and write `<targetDir>/vectors/<doc-path>.vec.json` with the fields `{ format: 1, doc_hash, chunker, model, dims, chunks: [{ start, end, breadcrumb, anchor, hash, vector }] }` (ADR-005, ADR-031).
 - `start` and `end` are offsets into the normalised body. `hash` = `sha256(breadcrumb + "\n" + text)`. `vector` is base64-encoded little-endian float16, widened to float32 when read (ADR-033).
-- The output is written deterministically (stable key order, trailing newline), so unchanged input produces a byte-identical file.
+- The output is written deterministically (stable key order, trailing newline), so unchanged input produces a byte-identical file. Files are written through a temp file and a rename, so a reader never sees a partial sidecar.
+- Reading and writing share one strict schema, so a malformed sidecar fails fast with an error naming the file: an unknown `format`, hashes that aren't sha256 hex, chunks that are empty, overlapping or out of order, non-canonical base64, and vectors that don't match `dims` or hold values float16 can't represent. Offsets are UTF-16 code units. The document path must be a normalised POSIX path relative to the knowledge base.
 - **Tests:** round trip (within float16 precision), a byte-exact literal fixture, and offsets resolving back to the expected text.
 
 ## Milestone 3: Chunking
