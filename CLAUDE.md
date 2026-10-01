@@ -8,7 +8,7 @@ An open-source engine that serves a Git repository of Markdown files to AI agent
 - **Package manager:** pnpm
 - **Search:** `@orama/orama` (in-process hybrid index)
 - **Query-path models (local):** `@huggingface/transformers` on `onnxruntime-node`. The embedder is `Xenova/bge-small-en-v1.5` and the reranker is `Xenova/ms-marco-MiniLM-L-6-v2` (q8).
-- **Parsing and validation:** `mdast-util-from-markdown`, `mdast-util-frontmatter`, `yaml`, `zod`
+- **Parsing and validation:** `mdast-util-from-markdown`, `mdast-util-frontmatter`, `mdast-util-gfm-table` (tables are parsed as tables), `mdast-util-to-string`, `yaml`, `zod`
 - **HTTP:** `node:http`, with no framework
 - **Tooling:** Biome (lint and format), Vitest (tests), Lefthook (git hooks)
 
