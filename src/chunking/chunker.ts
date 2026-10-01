@@ -1,0 +1,16 @@
+import type { Document } from "../contract/loader.ts";
+import type { SidecarChunk } from "../sidecars/chunk.ts";
+
+/** Offsets are UTF-16 code units into the normalised document body. */
+export type ChunkSpan = Pick<
+  SidecarChunk,
+  "start" | "end" | "breadcrumb" | "anchor"
+>;
+
+export type ChunkerInput = Pick<Document, "title" | "body" | "tree">;
+
+export interface Chunker {
+  /** Recorded in the sidecar, e.g. `structural@1` (ADR-011). */
+  readonly id: string;
+  chunk(doc: ChunkerInput): Promise<ChunkSpan[]>;
+}
