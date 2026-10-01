@@ -1,7 +1,9 @@
 import type { Root } from "mdast";
 import { fromMarkdown } from "mdast-util-from-markdown";
 import { frontmatterFromMarkdown } from "mdast-util-frontmatter";
+import { gfmTableFromMarkdown } from "mdast-util-gfm-table";
 import { frontmatter } from "micromark-extension-frontmatter";
+import { gfmTable } from "micromark-extension-gfm-table";
 import { parse as parseYaml } from "yaml";
 
 export class FrontmatterError extends Error {
@@ -22,8 +24,11 @@ export interface ParsedDocument {
  */
 export function parseDocument(normalized: string): ParsedDocument {
   const tree = fromMarkdown(normalized, {
-    extensions: [frontmatter(["yaml"])],
-    mdastExtensions: [frontmatterFromMarkdown(["yaml"])],
+    extensions: [frontmatter(["yaml"]), gfmTable()],
+    mdastExtensions: [
+      frontmatterFromMarkdown(["yaml"]),
+      gfmTableFromMarkdown(),
+    ],
   });
 
   const [head, ...rest] = tree.children;
