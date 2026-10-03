@@ -13,6 +13,8 @@ describe("loadConfig", () => {
     expect(loadConfig({ sourceDir: "examples/docs" })).toEqual({
       sourceDir: join(cwd, "examples", "docs"),
       targetDir: join(cwd, "examples", "docs", ".md-rag"),
+      modelsDir: join(cwd, "examples", "docs", ".md-rag", "models"),
+      allowRemoteModels: true,
     });
   });
 
@@ -22,7 +24,72 @@ describe("loadConfig", () => {
     ).toEqual({
       sourceDir: join(cwd, "space", "docs"),
       targetDir: join(cwd, ".md-rag", "handbook"),
+      modelsDir: join(cwd, ".md-rag", "handbook", "models"),
+      allowRemoteModels: true,
     });
+  });
+
+  it("lets several knowledge bases share one models cache", () => {
+    const shared = loadConfig({
+      sourceDir: "a",
+      targetDir: ".md-rag/a",
+      modelsDir: ".md-rag/models",
+    });
+    expect(shared.modelsDir).toBe(join(cwd, ".md-rag", "models"));
+  });
+
+  it("can disallow remote models", () => {
+    expect(
+      loadConfig({ sourceDir: "docs", allowRemoteModels: false })
+        .allowRemoteModels,
+    ).toBe(false);
+  });
+
+  it.each(["docs", "."])(
+    "rejects a modelsDir that is sourceDir or one of its parents (%s)",
+    (modelsDir) => {
+      expect(() =>
+        loadConfig({ sourceDir: "docs", targetDir: "elsewhere", modelsDir }),
+      ).toThrow(/must not be sourceDir.*at modelsDir/s);
+    },
+  );
+
+  it("rejects a modelsDir inside sourceDir but outside targetDir", () => {
+    expect(() =>
+      loadConfig({ sourceDir: "docs", modelsDir: "docs/models" }),
+    ).toThrow(/must not be inside sourceDir.*at modelsDir/s);
+  });
+
+  it("accepts a modelsDir inside targetDir even when targetDir is inside sourceDir", () => {
+    expect(
+      loadConfig({ sourceDir: "docs", modelsDir: "docs/.md-rag/cache" })
+        .modelsDir,
+    ).toBe(join(cwd, "docs", ".md-rag", "cache"));
+  });
+
+  it("accepts a modelsDir shared by several engine folders", () => {
+    expect(
+      loadConfig({
+        sourceDir: "docs",
+        targetDir: ".md-rag/a",
+        modelsDir: ".md-rag",
+      }).modelsDir,
+    ).toBe(join(cwd, ".md-rag"));
+  });
+
+  it.each([".md-rag/vectors", ".md-rag/vectors/cache"])(
+    "rejects a modelsDir that is the sidecar folder or inside it (%s)",
+    (modelsDir) => {
+      expect(() =>
+        loadConfig({ sourceDir: "docs", targetDir: ".md-rag", modelsDir }),
+      ).toThrow(/sidecar folder.*at modelsDir/s);
+    },
+  );
+
+  it("rejects an empty modelsDir", () => {
+    expect(() => loadConfig({ sourceDir: "docs", modelsDir: "" })).toThrow(
+      /modelsDir/,
+    );
   });
 
   it("keeps absolute directories as given", () => {
@@ -31,6 +98,8 @@ describe("loadConfig", () => {
     expect(loadConfig({ sourceDir, targetDir })).toEqual({
       sourceDir,
       targetDir,
+      modelsDir: join(targetDir, "models"),
+      allowRemoteModels: true,
     });
   });
 
