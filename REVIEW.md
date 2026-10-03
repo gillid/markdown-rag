@@ -30,6 +30,7 @@ Checklist for automated and human PR review of md-rag. Rules here are drawn from
 ### Language and tooling
 
 - **Erasable TypeScript syntax only.** No `enum`, no `namespace`, no parameter properties — flag any use since these can't be stripped without a build step (ADR-020).
+- **No `as` casts in production code.** Flag any `as` type assertion under `src/` (casts in tests are fine) unless the PR explains why it is unavoidable. Prefer type guards, narrowing, `satisfies` or fixing the types; `isErrnoException` and `errorMessage` in `src/errors.ts` cover the common `catch` cases. `as const` and `import * as` are not type assertions.
 
 ### Tests
 

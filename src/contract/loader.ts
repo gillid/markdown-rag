@@ -3,9 +3,10 @@ import { join, relative, sep } from "node:path";
 import type { Root } from "mdast";
 import { z } from "zod";
 import type { Config } from "../config/config.ts";
+import { errorMessage } from "../errors.ts";
 import { type DocumentMetadata, parseFrontmatterMetadata } from "./document.ts";
 import { hashDocument, normalizeLineEndings } from "./hash.ts";
-import { FrontmatterError, parseDocument } from "./tree.ts";
+import { parseDocument } from "./tree.ts";
 
 const MAX_FILE_SIZE_BYTES = 1024 * 1024;
 
@@ -91,10 +92,7 @@ function describeError(cause: unknown): string {
   if (cause instanceof z.ZodError) {
     return z.prettifyError(cause);
   }
-  if (cause instanceof FrontmatterError || cause instanceof Error) {
-    return cause.message;
-  }
-  return String(cause);
+  return errorMessage(cause);
 }
 
 async function findMarkdownFiles(

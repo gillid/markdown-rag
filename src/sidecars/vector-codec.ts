@@ -6,12 +6,12 @@ export function encodeVector(vector: Float32Array, dims: number): string {
     throw new Error(`vector has ${vector.length} dims, expected ${dims}`);
   }
   const view = new DataView(new ArrayBuffer(dims * BYTES_PER_VALUE));
-  for (let i = 0; i < dims; i++) {
+  for (const [i, value] of vector.entries()) {
     const offset = i * BYTES_PER_VALUE;
-    view.setFloat16(offset, vector[i] as number, LITTLE_ENDIAN);
+    view.setFloat16(offset, value, LITTLE_ENDIAN);
     // A value past the float16 range rounds to Infinity, which would poison cosine scores.
     if (!Number.isFinite(view.getFloat16(offset, LITTLE_ENDIAN))) {
-      throw new Error(`value ${vector[i]} does not fit in float16`);
+      throw new Error(`value ${value} does not fit in float16`);
     }
   }
   return Buffer.from(view.buffer).toString("base64");

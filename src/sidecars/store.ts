@@ -1,6 +1,8 @@
 import { randomUUID } from "node:crypto";
 import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
+import { VECTORS_DIR_NAME } from "../config/layout.ts";
+import { errorMessage, isErrnoException } from "../errors.ts";
 import {
   parseSidecar,
   type Sidecar,
@@ -8,7 +10,6 @@ import {
   serializeSidecar,
 } from "./sidecar.ts";
 
-const VECTORS_DIR = "vectors";
 const SIDECAR_SUFFIX = ".vec.json";
 const WINDOWS_DRIVE = /^[A-Za-z]:/;
 
@@ -26,7 +27,7 @@ export function sidecarPath(targetDir: string, docPath: string): string {
       `document path must be a normalised POSIX path relative to the knowledge base: ${docPath}`,
     );
   }
-  return resolve(targetDir, VECTORS_DIR, `${docPath}${SIDECAR_SUFFIX}`);
+  return resolve(targetDir, VECTORS_DIR_NAME, `${docPath}${SIDECAR_SUFFIX}`);
 }
 
 export async function readSidecar(
@@ -38,17 +39,17 @@ export async function readSidecar(
   try {
     json = await readFile(path, "utf8");
   } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+    if (isErrnoException(error) && error.code === "ENOENT") {
       return undefined;
     }
-    throw new SidecarError(`${path}: ${(error as Error).message}`, {
+    throw new SidecarError(`${path}: ${errorMessage(error)}`, {
       cause: error,
     });
   }
   try {
     return parseSidecar(json);
   } catch (error) {
-    throw new SidecarError(`${path}: ${(error as Error).message}`, {
+    throw new SidecarError(`${path}: ${errorMessage(error)}`, {
       cause: error,
     });
   }
