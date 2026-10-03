@@ -1,6 +1,7 @@
 import { parseArgs } from "node:util";
 import { ConfigError, loadConfig } from "../config/config.ts";
 import { loadKnowledgeBase } from "../contract/loader.ts";
+import { errorMessage } from "../errors.ts";
 import type { CliResult } from "./result.ts";
 
 export const CHECK_HELP = `Usage: md-rag check --source-dir <dir> [options]
@@ -28,7 +29,7 @@ export async function runCheck(argv: readonly string[]): Promise<CliResult> {
       allowPositionals: false,
     }));
   } catch (cause) {
-    return usageError((cause as Error).message);
+    return usageError(errorMessage(cause));
   }
 
   if (values.help) {
@@ -57,7 +58,7 @@ export async function runCheck(argv: readonly string[]): Promise<CliResult> {
     return {
       exitCode: 1,
       stdout: "",
-      stderr: `check: ${(cause as Error).message}\n`,
+      stderr: `check: ${errorMessage(cause)}\n`,
     };
   }
   const { documents, errors } = result;

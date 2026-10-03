@@ -1,13 +1,19 @@
-import { isAbsolute, join, relative, resolve, sep } from "node:path";
+import { join, resolve } from "node:path";
 import { z } from "zod";
-
-const ENGINE_DIR_NAME = ".md-rag";
+import {
+  ENGINE_DIR_NAME,
+  MODELS_DIR_NAME,
+  VECTORS_DIR_NAME,
+} from "./layout.ts";
+import { isSameOrAncestor, isStrictlyInside } from "./paths.ts";
 
 // Every optional field gets a default here, so Config is always complete.
 const configSchema = z
   .strictObject({
     sourceDir: z.string().min(1, "must not be empty"),
     targetDir: z.string().min(1, "must not be empty").optional(),
+    modelsDir: z.string().min(1, "must not be empty").optional(),
+    allowRemoteModels: z.boolean().default(true),
   })
   .transform((input, ctx) => {
     const sourceDir = resolve(input.sourceDir);
@@ -24,7 +30,49 @@ const configSchema = z
       });
       return z.NEVER;
     }
-    return { sourceDir, targetDir };
+    const modelsDir =
+      input.modelsDir === undefined
+        ? join(targetDir, MODELS_DIR_NAME)
+        : resolve(input.modelsDir);
+    if (isSameOrAncestor(modelsDir, sourceDir)) {
+      ctx.issues.push({
+        code: "custom",
+        message: "must not be sourceDir or one of its parent directories",
+        path: ["modelsDir"],
+        input: input.modelsDir,
+      });
+      return z.NEVER;
+    }
+    if (
+      isStrictlyInside(modelsDir, sourceDir) &&
+      !isSameOrAncestor(targetDir, modelsDir)
+    ) {
+      ctx.issues.push({
+        code: "custom",
+        message:
+          "must not be inside sourceDir, unless it is inside targetDir (the engine writes nothing else into a knowledge base)",
+        path: ["modelsDir"],
+        input: input.modelsDir,
+      });
+      return z.NEVER;
+    }
+    const vectorsDir = join(targetDir, VECTORS_DIR_NAME);
+    if (isSameOrAncestor(vectorsDir, modelsDir)) {
+      ctx.issues.push({
+        code: "custom",
+        message:
+          "must not be the sidecar folder (targetDir/vectors) or inside it",
+        path: ["modelsDir"],
+        input: input.modelsDir,
+      });
+      return z.NEVER;
+    }
+    return {
+      sourceDir,
+      targetDir,
+      modelsDir,
+      allowRemoteModels: input.allowRemoteModels,
+    };
   });
 
 export type ConfigInput = z.input<typeof configSchema>;
@@ -42,9 +90,4 @@ export function loadConfig(input: ConfigInput): Config {
     );
   }
   return result.data;
-}
-
-function isSameOrAncestor(dir: string, of: string): boolean {
-  const path = relative(dir, of);
-  return path === "" || (!isAbsolute(path) && path.split(sep)[0] !== "..");
 }

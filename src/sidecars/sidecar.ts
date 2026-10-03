@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { errorMessage } from "../errors.ts";
 import type { SidecarChunk } from "./chunk.ts";
 import { decodeVector, encodeVector } from "./vector-codec.ts";
 
@@ -70,7 +71,7 @@ function inChunk<T>(start: number, action: () => T): T {
   try {
     return action();
   } catch (error) {
-    throw new SidecarError(`chunk at ${start}: ${(error as Error).message}`, {
+    throw new SidecarError(`chunk at ${start}: ${errorMessage(error)}`, {
       cause: error,
     });
   }
@@ -105,7 +106,7 @@ export function parseSidecar(json: string): Sidecar {
   try {
     raw = JSON.parse(json);
   } catch (error) {
-    throw new SidecarError(`invalid JSON: ${(error as Error).message}`);
+    throw new SidecarError(`invalid JSON: ${errorMessage(error)}`);
   }
 
   const file = validate(raw);

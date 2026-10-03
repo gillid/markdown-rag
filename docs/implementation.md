@@ -79,12 +79,12 @@ Status: `planned` · `in-progress` · `done`
 
 ## Milestone 4: Write path
 
-### 10. Embedder · `planned`
+### 10. Embedder · `done`
 
-- An `Embedder` interface (`embedDocuments`, `embedQuery`, `modelId`, `dims`) and a transformers.js implementation: `feature-extraction` with mean pooling and normalisation, q8 weights, and a pinned model revision (ADR-009, ADR-010).
-- Config covers the model cache directory (`modelsDir`, default `<targetDir>/models/`, overridable with `--models-dir`) and whether remote models are allowed (ADR-022, ADR-031). Several knowledge bases in one repository each have their own `targetDir`, so they share one cache by passing the same `--models-dir` (ADR-037). Both are passed to transformers.js explicitly, never through environment variables (ADR-032). The model loads lazily, once. The BGE query instruction prefix is applied only to queries.
+- An `Embedder` interface (`embedDocuments`, `embedQuery`, `modelId`, `dims`) and a transformers.js implementation: `feature-extraction` with CLS-token pooling (as BGE is trained, ADR-010) and normalisation, q8 weights, and a pinned model revision (ADR-009, ADR-010).
+- Config covers the model cache directory (`modelsDir`, default `<targetDir>/models/`, overridable with `--models-dir`, a flag that arrives with `embed` in step 11) and whether remote models are allowed (ADR-022, ADR-031). Several knowledge bases in one repository each have their own `targetDir`, so they share one cache by passing the same `--models-dir` (ADR-037). Both are passed to transformers.js explicitly, never through environment variables (ADR-032). The model loads lazily, once. The BGE query instruction prefix is applied only to queries.
 - Model presets map a model ID (the value recorded in sidecars) to its Hugging Face repository, pinned revision, dimensions and query prefix. The PoC has one embedding preset, `bge-small-en-v1.5` (ADR-010).
-- A shared `ensureEngineDir(targetDir)` creates `targetDir` and writes `<targetDir>/.gitignore` with its canonical content, `*`, which ignores the whole folder, overwriting any edits, since nothing in `targetDir` is hand-edited (ADR-031, ADR-038). Model loading calls it before anything is downloaded into the default cache, and step 11 reuses it.
+- A shared `ensureEngineDir(targetDir)` creates `targetDir` and writes `<targetDir>/.gitignore` with its canonical content, `*`, which ignores the whole folder, restoring it when it is missing or edited, since nothing in `targetDir` is hand-edited (ADR-031, ADR-038). Model loading calls it before anything is downloaded into the default cache, and step 11 reuses it. A `modelsDir` outside `targetDir` gets a `.gitignore` of `*` only when it has none; an existing one is left alone and reported with a warning. `modelsDir` must not be `sourceDir` or one of its parents. With remote models off, loading never writes anything and a missing model fails with an error naming the repository, revision and `modelsDir`.
 - **Tests:** a `*.models.test.ts` checks that a paraphrase pair outscores an unrelated pair, and that vectors have 384 dimensions and are L2-normalised.
 
 ### 11. `md-rag embed` · `planned`
@@ -94,8 +94,9 @@ Status: `planned` · `in-progress` · `done`
   - reuse vectors from the old sidecar where a chunk hash matches, and embed the rest
   - write the sidecar to `<targetDir>/vectors/`, creating the folder through `ensureEngineDir` on first run (ADR-031)
 - `embed` always uses the engine's embedding preset (step 10). A sidecar recorded with a different model has its recorded chunks re-embedded, without re-chunking (ADR-032). A chunker change alone invalidates nothing (ADR-024).
+- Accepts `--models-dir` and an offline flag (`--offline`, which sets `allowRemoteModels` to false) and passes them to the embedder (step 10, ADR-022, ADR-037).
 - Deletes sidecars that no longer have a matching document. Prints a summary (documents processed, chunks embedded or reused, failures).
-- Embeds in batches across documents. If a batch fails, it retries that batch one document at a time, reports the documents that failed, leaves their sidecars untouched and exits non-zero, while all other documents are still written. This follows Onyx's `embed_chunks_with_failure_handling`.
+- Embeds in batches across documents. A vector shifts slightly with the other texts in its batch (q8 and padding), so unchanged chunks keep their old vectors through the hash reuse above rather than being embedded again. If a batch fails, it retries that batch one document at a time, reports the documents that failed, leaves their sidecars untouched and exits non-zero, while all other documents are still written. This follows Onyx's `embed_chunks_with_failure_handling`.
 - **Tests:** use a counting fake embedder and a fake chunker. Editing one document processes only that document and re-embeds only its changed chunks. Deleting a document prunes its sidecar. A sidecar recorded with a different model is re-embedded without re-chunking. When the embedder fails on one document, only that document is reported and every other sidecar is still written. The first run on a fresh knowledge base creates `<targetDir>/.gitignore`, and an edited one is restored to its canonical content.
 - Sidecars are never committed, including for `examples/docs` (ADR-038). Tests that need them generate them into a temporary `targetDir`.
 
@@ -209,10 +210,12 @@ Status: `planned` · `in-progress` · `done`
 - **Chunk size:** compare splitter targets of ~1,000 and ~2,000 characters. Onyx targets 512 tokens.
 - **Reranker:** compare with and without it (`--no-rerank`), and decide the default under ADR-027, weighing the quality gain against the rerank p95.
 - **Modes:** compare `hybrid`, `keyword` and `semantic`.
+- **Pooling:** compare CLS (the default) with mean pooling on the golden queries; a change invalidates every sidecar, so decide it before release.
 - Tune the hybrid weights, title boost, K, `min_score`, `weights.recency` and the 0.5 cap on the summed signal weights (ADR-034).
 - Record everything in `docs/benchmarks.md`. Update the defaults and the relevant ADR entries if any values change. Confirm the PoC success criteria (design §2).
 
 ### 24. Integrator documentation · `planned`
 
 - `README.md` covers: what the project is, a no-install quick start (`npx md-rag embed`, `check`, `search` and `serve` against a local directory), installing it (`pnpm add md-rag`) for the library API, and the configuration reference (the CLI flags and the matching `createEngine` options, ADR-032).
+- The configuration reference also covers the model cache: a custom `--models-dir` is git-ignored by the engine only when it has no `.gitignore` of its own, a corrupted cache is fixed by deleting `modelsDir`, transformers.js reads `HF_TOKEN` and `HF_ACCESS_TOKEN` from the environment when it downloads, so a stale token can fail the download of the public model, and it looks in `/models/<repository>` before the cache, so a directory mounted there would shadow the pinned weights.
 - `docs/contract.md` is the full frontmatter contract (including `signals`, ADR-034), the engine folder's layout and the sidecar format, and how to run `md-rag embed` in a deployment pipeline with a cached engine folder (ADR-038), written for exporter authors and integrators. It spells out the exporter's obligations under A4: byte-identical output for unchanged content (no export timestamps in files), `updated_at` taken from the source's change time, and tags as the filterable vocabulary (ADR-035).
