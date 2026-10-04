@@ -1,43 +1,25 @@
 import type { FeatureExtractionPipeline } from "@huggingface/transformers";
-import type { Config } from "../config/config.ts";
-import { isSameOrAncestor } from "../config/paths.ts";
-import { errorMessage } from "../errors.ts";
-import {
-  ensureEngineDir,
-  ensureModelsDirIgnored,
-} from "../sidecars/engine-dir.ts";
+import { type ModelsConfig, prepareDownloadDir } from "./download-dir.ts";
 import {
   type Embedder,
   EmbedderError,
   EmbedderUnavailableError,
 } from "./embedder.ts";
+import { lazyModel, offlineModelMissingMessage } from "./lazy-model.ts";
 import { DEFAULT_EMBEDDING_PRESET, type EmbeddingPreset } from "./presets.ts";
 
 const BATCH_SIZE = 32;
 
-type EmbedderConfig = Pick<
-  Config,
-  "targetDir" | "modelsDir" | "allowRemoteModels"
->;
-
 export function createTransformersEmbedder(
-  config: EmbedderConfig,
+  config: ModelsConfig,
   preset: EmbeddingPreset = DEFAULT_EMBEDDING_PRESET,
 ): Embedder {
-  let extractor: Promise<FeatureExtractionPipeline> | undefined;
-
-  const load = (): Promise<FeatureExtractionPipeline> => {
-    extractor ??= loadExtractor(config, preset).catch((error: unknown) => {
-      extractor = undefined;
-      throw error instanceof EmbedderUnavailableError
-        ? error
-        : new EmbedderUnavailableError(
-            `Could not load ${preset.id}: ${errorMessage(error)}`,
-            { cause: error },
-          );
-    });
-    return extractor;
-  };
+  const load = lazyModel(
+    preset,
+    () => loadExtractor(config, preset),
+    (error) => error instanceof EmbedderUnavailableError,
+    (message, cause) => new EmbedderUnavailableError(message, { cause }),
+  );
 
   const embedBatch = async (texts: string[]): Promise<Float32Array[]> => {
     const output = await (await load())(texts, {
@@ -81,7 +63,7 @@ export function createTransformersEmbedder(
 }
 
 async function loadExtractor(
-  config: EmbedderConfig,
+  config: ModelsConfig,
   preset: EmbeddingPreset,
 ): Promise<FeatureExtractionPipeline> {
   // Offline loading never writes, so read-only mounts keep working.
@@ -103,29 +85,10 @@ async function loadExtractor(
   } catch (error) {
     if (!config.allowRemoteModels && error instanceof ModelFileNotFoundError) {
       throw new EmbedderUnavailableError(
-        `Model ${preset.repository}@${preset.revision} is not in ${config.modelsDir} and remote models are disabled. Pre-fetch it into that directory or allow remote models.`,
+        offlineModelMissingMessage(preset, config),
         { cause: error },
       );
     }
     throw error;
-  }
-}
-
-// Best effort: the .gitignore is a convenience, so e.g. a read-only mount of pre-fetched weights still loads.
-async function prepareDownloadDir(config: EmbedderConfig): Promise<void> {
-  try {
-    if (isSameOrAncestor(config.targetDir, config.modelsDir)) {
-      await ensureEngineDir(config.targetDir);
-    } else if (
-      (await ensureModelsDirIgnored(config.modelsDir)) === "unverified"
-    ) {
-      process.emitWarning(
-        `${config.modelsDir} has its own .gitignore, which was not checked: make sure it keeps the downloaded model weights out of Git.`,
-      );
-    }
-  } catch (error) {
-    process.emitWarning(
-      `Could not prepare ${config.modelsDir} (${errorMessage(error)}); continuing without setting up its .gitignore.`,
-    );
   }
 }
