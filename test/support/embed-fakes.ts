@@ -12,13 +12,18 @@ export interface CountingEmbedder extends Embedder {
 
 /** Fails any call whose texts include `failOn`, like a model choking on one document. */
 export function createCountingEmbedder(
-  options: { modelId?: string; failOn?: string } = {},
+  options: { modelId?: string; dims?: number; failOn?: string } = {},
 ): CountingEmbedder {
   const embeddedTexts: string[] = [];
   const batchSizes: number[] = [];
+  const dims = options.dims ?? 4;
+  const vectorOf = (text: string) =>
+    Float32Array.from({ length: dims }, (_, i) =>
+      i === 0 ? text.length / 100 : 0.5 / 2 ** (i - 1),
+    );
   return {
     modelId: options.modelId ?? "fake-model",
-    dims: 4,
+    dims,
     embeddedTexts,
     batchSizes,
     async embedDocuments(texts) {
@@ -30,12 +35,10 @@ export function createCountingEmbedder(
         throw new Error(`cannot embed "${options.failOn}"`);
       }
       embeddedTexts.push(...texts);
-      return texts.map((text) =>
-        Float32Array.of(text.length / 100, 0.5, 0.25, 0.125),
-      );
+      return texts.map(vectorOf);
     },
     async embedQuery(text) {
-      return Float32Array.of(text.length / 100, 0.5, 0.25, 0.125);
+      return vectorOf(text);
     },
   };
 }
