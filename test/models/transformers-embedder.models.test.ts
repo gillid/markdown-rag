@@ -11,11 +11,9 @@ import { join } from "node:path";
 import { pipeline } from "@huggingface/transformers";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { type ConfigInput, loadConfig } from "../../src/config/config.ts";
+import { EmbedderError } from "../../src/models/embedder.ts";
 import { DEFAULT_EMBEDDING_PRESET } from "../../src/models/presets.ts";
-import {
-  createTransformersEmbedder,
-  EmbedderError,
-} from "../../src/models/transformers-embedder.ts";
+import { createTransformersEmbedder } from "../../src/models/transformers-embedder.ts";
 
 const TIMEOUT = 120_000;
 

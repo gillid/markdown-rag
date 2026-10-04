@@ -6,14 +6,14 @@ import {
   ensureEngineDir,
   ensureModelsDirIgnored,
 } from "../sidecars/engine-dir.ts";
-import type { Embedder } from "./embedder.ts";
+import {
+  type Embedder,
+  EmbedderError,
+  EmbedderUnavailableError,
+} from "./embedder.ts";
 import { DEFAULT_EMBEDDING_PRESET, type EmbeddingPreset } from "./presets.ts";
 
 const BATCH_SIZE = 32;
-
-export class EmbedderError extends Error {
-  override readonly name = "EmbedderError";
-}
 
 type EmbedderConfig = Pick<
   Config,
@@ -29,7 +29,12 @@ export function createTransformersEmbedder(
   const load = (): Promise<FeatureExtractionPipeline> => {
     extractor ??= loadExtractor(config, preset).catch((error: unknown) => {
       extractor = undefined;
-      throw error;
+      throw error instanceof EmbedderUnavailableError
+        ? error
+        : new EmbedderUnavailableError(
+            `Could not load ${preset.id}: ${errorMessage(error)}`,
+            { cause: error },
+          );
     });
     return extractor;
   };
@@ -97,7 +102,7 @@ async function loadExtractor(
     });
   } catch (error) {
     if (!config.allowRemoteModels && error instanceof ModelFileNotFoundError) {
-      throw new EmbedderError(
+      throw new EmbedderUnavailableError(
         `Model ${preset.repository}@${preset.revision} is not in ${config.modelsDir} and remote models are disabled. Pre-fetch it into that directory or allow remote models.`,
         { cause: error },
       );
