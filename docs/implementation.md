@@ -124,10 +124,12 @@ Status: `planned` · `in-progress` · `done`
 - In `keyword` mode the query embedding is skipped.
 - **Tests:** an exact error-code query finds its document in `keyword` mode, and filters narrow results in every mode, using sidecars from a fake embedder. A `*.models.test.ts` embeds `examples/docs` into a temporary `targetDir` and checks that a paraphrase query finds its document in `semantic` mode (sidecars are not committed, so there are no real vectors to reuse, ADR-038).
 
-### 15. Reranker · `planned`
+### 15. Reranker · `done`
 
-- A `Reranker` interface and a transformers.js implementation (`AutoTokenizer` and `AutoModelForSequenceClassification`), which scores `(query, breadcrumb + text)` pairs in a single batch, truncating to 512 tokens.
-- **Tests:** a `*.models.test.ts` checks that a relevant passage outscores an irrelevant one.
+- A `Reranker` interface (`rerank(query, passages)` returns one raw logit per passage, `modelId`) and a transformers.js implementation (`AutoTokenizer` and `AutoModelForSequenceClassification`, q8, pinned revision, ADR-010), which scores `(query, breadcrumb + text)` pairs, 32 per model call. A score that is not finite is an error. It shares the model cache setup with the embedder (`ensureEngineDir` and the `.gitignore` handling, ADR-022, ADR-031).
+- Each pair fits 512 tokens, counting the three special tokens. transformers.js truncates by slicing the whole sequence, which drops the closing `[SEP]` and lets a long query cut the passage away, so the query is first capped at 128 tokens and each passage is cut to the budget left, re-checked after decoding.
+- A model that can't be loaded fails with `RerankerUnavailableError`; any other failure while scoring is a `RerankerError`.
+- **Tests:** a `*.models.test.ts` checks that a relevant passage outscores an irrelevant one, including with a very long query and over-long passages. The budget arithmetic is unit-tested with a fake tokenizer.
 
 ### 16. Retrieval pipeline · `planned`
 
