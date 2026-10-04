@@ -1,4 +1,5 @@
 import { create, insertMultiple } from "@orama/orama";
+import { stopwords as englishStopWords } from "@orama/stopwords/english";
 import { formatPathErrors } from "../contract/format-errors.ts";
 import type {
   Document,
@@ -23,6 +24,9 @@ import type {
 } from "./knowledge-index.ts";
 import { buildOutline } from "./outline.ts";
 import { computeIndexVersion, type VersionedDocument } from "./version.ts";
+
+// English is fixed for the PoC, as are the models (ADR-010).
+const TOKENIZER = { language: "english", stopWords: englishStopWords };
 
 // Orama needs a vector size even when nothing is inserted, as for a knowledge base with no documents.
 const EMPTY_INDEX_DIMS = 1;
@@ -83,6 +87,7 @@ export async function buildIndex(
 
   const orama = create({
     schema: createChunkSchema(freshness.model?.dims ?? EMPTY_INDEX_DIMS),
+    components: { tokenizer: TOKENIZER },
   });
   await insertMultiple(orama, records);
 
