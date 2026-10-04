@@ -2,6 +2,7 @@ import type { Chunker, ChunkSpan } from "../chunking/chunker.ts";
 import type { Document } from "../contract/loader.ts";
 import type { Embedder } from "../models/embedder.ts";
 import { chunkText, hashChunk } from "./chunk.ts";
+import { matchesDocument, matchesModel } from "./currency.ts";
 import type { Sidecar, SidecarHeader } from "./sidecar.ts";
 
 export interface PlannedChunk extends ChunkSpan {
@@ -46,9 +47,9 @@ export async function planSidecar(
 ): Promise<SidecarPlan | undefined> {
   const { doc, chunker, embedder, rechunk } = input;
   const header = input.previous?.header;
-  const sameModel =
-    header?.model === embedder.modelId && header.dims === embedder.dims;
-  const sameDocument = header?.docHash === doc.docHash;
+  const sameModel = header !== undefined && matchesModel(header, embedder);
+  const sameDocument =
+    header !== undefined && matchesDocument(header, doc.docHash);
 
   if (header && sameModel && sameDocument && !rechunk) {
     return undefined;

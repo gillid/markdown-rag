@@ -1,4 +1,3 @@
-import { realpath } from "node:fs/promises";
 import { relative } from "node:path";
 import type { Chunker } from "../chunking/chunker.ts";
 import type { DocumentLoadError, KnowledgeBase } from "../contract/loader.ts";
@@ -6,6 +5,7 @@ import { errorMessage } from "../errors.ts";
 import { type Embedder, EmbedderUnavailableError } from "../models/embedder.ts";
 import { embedPlans } from "./embed-plans.ts";
 import { ensureEngineDir } from "./engine-dir.ts";
+import { findCaseAliases, knownDocumentPaths } from "./known-paths.ts";
 import { completeSidecar, planSidecar, type SidecarPlan } from "./plan.ts";
 import { SidecarContentError } from "./sidecar.ts";
 import {
@@ -13,7 +13,6 @@ import {
   deleteTempFile,
   openSidecar,
   scanVectorsDir,
-  sidecarPath,
   writeSidecar,
 } from "./store.ts";
 
@@ -145,20 +144,14 @@ function tolerateInvalidSync<T>(read: () => T): T | undefined {
   }
 }
 
-// A document that failed the contract still exists, so its sidecar is not an orphan.
 async function prune(
   targetDir: string,
-  { documents, errors }: KnowledgeBase,
+  knowledgeBase: KnowledgeBase,
   report: EmbedReport,
 ): Promise<void> {
-  const existing = new Set([
-    ...documents.map((doc) => doc.path),
-    ...errors.map((error) => error.path),
-  ]);
-  const existingByLowerCase = new Map(
-    [...existing].map((path) => [path.toLowerCase(), path]),
-  );
+  const existing = knownDocumentPaths(knowledgeBase);
   const { docPaths, tempFiles } = await scanVectorsDir(targetDir);
+  const aliases = await findCaseAliases(targetDir, existing, docPaths);
 
   // Temp files go first so the directories they keep non-empty can be tidied.
   for (const tempFile of tempFiles) {
@@ -168,10 +161,10 @@ async function prune(
       report,
     );
   }
-  for (const path of docPaths.filter((docPath) => !existing.has(docPath))) {
-    if (await isCaseAliasOfExisting(targetDir, path, existingByLowerCase)) {
-      continue;
-    }
+  const orphans = docPaths.filter(
+    (docPath) => !existing.has(docPath) && !aliases.has(docPath),
+  );
+  for (const path of orphans) {
     if (await attempt(path, () => deleteSidecar(targetDir, path), report)) {
       report.pruned++;
     }
@@ -188,24 +181,6 @@ async function attempt(
     return true;
   } catch (cause) {
     report.warnings.push(`${path}: could not prune: ${errorMessage(cause)}`);
-    return false;
-  }
-}
-
-// On a case-insensitive filesystem a sidecar named for the old spelling of a renamed document is the live one.
-async function isCaseAliasOfExisting(
-  targetDir: string,
-  orphan: string,
-  existingByLowerCase: ReadonlyMap<string, string>,
-): Promise<boolean> {
-  const alias = existingByLowerCase.get(orphan.toLowerCase());
-  if (alias === undefined) return false;
-  try {
-    return (
-      (await realpath(sidecarPath(targetDir, orphan))) ===
-      (await realpath(sidecarPath(targetDir, alias)))
-    );
-  } catch {
     return false;
   }
 }
