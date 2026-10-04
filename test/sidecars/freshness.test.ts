@@ -43,7 +43,10 @@ describe("checkFreshness", () => {
       ]),
     );
 
-    expect(result).toEqual({ ok: true, model: { modelId: MODEL, dims: 384 } });
+    expect(result).toMatchObject({
+      ok: true,
+      model: { modelId: MODEL, dims: 384 },
+    });
   });
 
   it("reports a document with no sidecar", () => {
@@ -102,7 +105,10 @@ describe("checkFreshness", () => {
       ]),
     );
 
-    expect(result).toEqual({ ok: true, model: { modelId: MODEL, dims: 384 } });
+    expect(result).toMatchObject({
+      ok: true,
+      model: { modelId: MODEL, dims: 384 },
+    });
   });
 
   it("reports every current sidecar when they record different models, without naming a majority", () => {
@@ -199,7 +205,10 @@ describe("checkFreshness", () => {
       ]),
     );
 
-    expect(result).toEqual({ ok: true, model: { modelId: MODEL, dims: 384 } });
+    expect(result).toMatchObject({
+      ok: true,
+      model: { modelId: MODEL, dims: 384 },
+    });
   });
 
   it("fails when the shared model has no preset", () => {
@@ -272,7 +281,7 @@ describe("checkFreshness", () => {
   it("passes an empty knowledge base, which has no model to load", () => {
     const result = checkFreshness(knowledgeBase([]), new Map());
 
-    expect(result).toEqual({ ok: true, model: undefined });
+    expect(result).toMatchObject({ ok: true, model: undefined });
   });
 
   it("does not suggest embed for an unreadable sidecar, which embed cannot rebuild", () => {

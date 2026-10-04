@@ -1,4 +1,4 @@
-import type { DocumentLoadError } from "../contract/loader.ts";
+import type { DocumentLoadError } from "./loader.ts";
 
 export function formatPathErrors(errors: readonly DocumentLoadError[]): string {
   return errors

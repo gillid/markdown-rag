@@ -6,6 +6,7 @@ import { errorMessage, isErrnoException } from "../errors.ts";
 import type { SidecarEntry } from "./freshness.ts";
 import { findCaseAliases, knownDocumentPaths } from "./known-paths.ts";
 import {
+  type OpenedSidecar,
   SidecarContentError,
   SidecarError,
   SidecarReadError,
@@ -16,9 +17,9 @@ import { openSidecar, scanVectorsDir } from "./store.ts";
 export async function readSidecarEntries(
   targetDir: string,
   knowledgeBase: KnowledgeBase,
-): Promise<Map<string, SidecarEntry>> {
+): Promise<Map<string, SidecarEntry<OpenedSidecar>>> {
   const vectorsDir = resolve(targetDir, VECTORS_DIR_NAME);
-  const entries = new Map<string, SidecarEntry>();
+  const entries = new Map<string, SidecarEntry<OpenedSidecar>>();
   if (!(await vectorsDirExists(vectorsDir))) {
     if (knowledgeBase.documents.length === 0) return entries;
     throw new SidecarError(
@@ -43,10 +44,9 @@ export async function readSidecarEntries(
 async function readEntry(
   targetDir: string,
   docPath: string,
-): Promise<SidecarEntry | undefined> {
+): Promise<SidecarEntry<OpenedSidecar> | undefined> {
   try {
-    const opened = await openSidecar(targetDir, docPath);
-    return opened && { header: opened.header };
+    return await openSidecar(targetDir, docPath);
   } catch (error) {
     if (error instanceof SidecarReadError) {
       return { failure: "unreadable", message: errorMessage(error) };
