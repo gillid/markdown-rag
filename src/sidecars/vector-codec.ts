@@ -1,6 +1,11 @@
 const BYTES_PER_VALUE = 2;
 const LITTLE_ENDIAN = true;
 
+/** Length of the canonical base64 text of a vector of `dims` values. */
+export function encodedVectorLength(dims: number): number {
+  return Math.ceil((dims * BYTES_PER_VALUE) / 3) * 4;
+}
+
 export function encodeVector(vector: Float32Array, dims: number): string {
   if (vector.length !== dims) {
     throw new Error(`vector has ${vector.length} dims, expected ${dims}`);

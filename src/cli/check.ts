@@ -1,8 +1,9 @@
 import { parseArgs } from "node:util";
-import { ConfigError, loadConfig } from "../config/config.ts";
 import { loadKnowledgeBase } from "../contract/loader.ts";
 import { errorMessage } from "../errors.ts";
-import type { CliResult } from "./result.ts";
+import { formatPathErrors } from "./format-errors.ts";
+import { loadConfigOutcome } from "./load-config.ts";
+import { type CliResult, usageError } from "./result.ts";
 
 export const CHECK_HELP = `Usage: md-rag check --source-dir <dir> [options]
 
@@ -29,7 +30,7 @@ export async function runCheck(argv: readonly string[]): Promise<CliResult> {
       allowPositionals: false,
     }));
   } catch (cause) {
-    return usageError(errorMessage(cause));
+    return usageError(errorMessage(cause), CHECK_HELP);
   }
 
   if (values.help) {
@@ -38,22 +39,20 @@ export async function runCheck(argv: readonly string[]): Promise<CliResult> {
 
   const sourceDir = values["source-dir"];
   if (sourceDir === undefined) {
-    return usageError("check: --source-dir is required");
+    return usageError("check: --source-dir is required", CHECK_HELP);
   }
 
-  let config: ReturnType<typeof loadConfig>;
-  try {
-    config = loadConfig({ sourceDir, targetDir: values["target-dir"] });
-  } catch (cause) {
-    if (cause instanceof ConfigError) {
-      return { exitCode: 1, stdout: "", stderr: `${cause.message}\n` };
-    }
-    throw cause;
+  const configOutcome = loadConfigOutcome({
+    sourceDir,
+    targetDir: values["target-dir"],
+  });
+  if (!configOutcome.ok) {
+    return configOutcome.result;
   }
 
   let result: Awaited<ReturnType<typeof loadKnowledgeBase>>;
   try {
-    result = await loadKnowledgeBase(config);
+    result = await loadKnowledgeBase(configOutcome.config);
   } catch (cause) {
     return {
       exitCode: 1,
@@ -64,15 +63,11 @@ export async function runCheck(argv: readonly string[]): Promise<CliResult> {
   const { documents, errors } = result;
 
   if (errors.length > 0) {
-    const lines = errors
-      .slice()
-      .sort((a, b) => a.path.localeCompare(b.path))
-      .map((error) => `${error.path}: ${error.reason}`);
     const total = documents.length + errors.length;
     return {
       exitCode: 1,
       stdout: "",
-      stderr: `${lines.join("\n")}\n\n${errors.length} of ${total} document(s) failed the contract.\n`,
+      stderr: `${formatPathErrors(errors)}\n\n${errors.length} of ${total} document(s) failed the contract.\n`,
     };
   }
 
@@ -81,8 +76,4 @@ export async function runCheck(argv: readonly string[]): Promise<CliResult> {
     stdout: `${documents.length} document(s) passed the contract.\n`,
     stderr: "",
   };
-}
-
-function usageError(message: string): CliResult {
-  return { exitCode: 1, stdout: "", stderr: `${message}\n\n${CHECK_HELP}` };
 }

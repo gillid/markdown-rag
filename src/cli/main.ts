@@ -1,11 +1,13 @@
 import { pathToFileURL } from "node:url";
 import { runCheck } from "./check.ts";
+import { runEmbed } from "./embed.ts";
 import type { CliResult } from "./result.ts";
 
 export const HELP = `Usage: md-rag <command> [options]
 
 Commands:
   check   Validate the knowledge base contract
+  embed   Chunk and embed documents into sidecars
 
 Options:
   -h, --help  Show this help message
@@ -20,6 +22,10 @@ export async function run(argv: readonly string[]): Promise<CliResult> {
 
   if (command === "check") {
     return runCheck(rest);
+  }
+
+  if (command === "embed") {
+    return runEmbed(rest);
   }
 
   return { exitCode: 1, stdout: "", stderr: `Unknown command\n\n${HELP}` };
