@@ -18,6 +18,20 @@ export const BGE_SMALL_EN_V1_5: EmbeddingPreset = {
 
 export const DEFAULT_EMBEDDING_PRESET = BGE_SMALL_EN_V1_5;
 
+export interface RerankerPreset {
+  id: string;
+  repository: string;
+  revision: string;
+}
+
+export const MS_MARCO_MINILM_L6_V2: RerankerPreset = {
+  id: "ms-marco-MiniLM-L-6-v2",
+  repository: "Xenova/ms-marco-MiniLM-L-6-v2",
+  revision: "a09144355adeed5f58c8ed011d209bf8ee5a1fec",
+};
+
+export const DEFAULT_RERANKER_PRESET = MS_MARCO_MINILM_L6_V2;
+
 const EMBEDDING_PRESETS: readonly EmbeddingPreset[] = [BGE_SMALL_EN_V1_5];
 
 export function findEmbeddingPreset(id: string): EmbeddingPreset | undefined {
