@@ -1,10 +1,10 @@
 import { parseArgs } from "node:util";
+import { formatPathErrors } from "../contract/format-errors.ts";
 import { type KnowledgeBase, loadKnowledgeBase } from "../contract/loader.ts";
 import { errorMessage, isErrnoException } from "../errors.ts";
 import { checkFreshness } from "../sidecars/freshness.ts";
 import { readSidecarEntries } from "../sidecars/read-entries.ts";
 import { SidecarError } from "../sidecars/sidecar.ts";
-import { formatPathErrors } from "./format-errors.ts";
 import { loadConfigOutcome } from "./load-config.ts";
 import { type CliResult, usageError } from "./result.ts";
 

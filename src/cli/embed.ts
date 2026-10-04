@@ -1,6 +1,7 @@
 import { parseArgs } from "node:util";
 import { createStructuralChunker } from "../chunking/structural-chunker.ts";
 import type { Config } from "../config/config.ts";
+import { formatPathErrors } from "../contract/format-errors.ts";
 import {
   type DocumentLoadError,
   loadKnowledgeBase,
@@ -9,7 +10,6 @@ import { errorMessage } from "../errors.ts";
 import type { Embedder } from "../models/embedder.ts";
 import { createTransformersEmbedder } from "../models/transformers-embedder.ts";
 import { type EmbedReport, embedKnowledgeBase } from "../sidecars/embed.ts";
-import { formatPathErrors } from "./format-errors.ts";
 import { loadConfigOutcome } from "./load-config.ts";
 import { type CliResult, usageError } from "./result.ts";
 

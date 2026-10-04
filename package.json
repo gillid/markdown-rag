@@ -34,6 +34,7 @@
   },
   "dependencies": {
     "@huggingface/transformers": "^4.3.0",
+    "@orama/orama": "^3.1.18",
     "mdast-util-from-markdown": "^2.0.3",
     "mdast-util-frontmatter": "^2.0.1",
     "mdast-util-gfm-table": "^2.0.0",
