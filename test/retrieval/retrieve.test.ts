@@ -10,6 +10,7 @@ import type { RetrievalDefaults } from "../../src/retrieval/types.ts";
 import { buildTestIndex, MODEL } from "../support/build-test-index.ts";
 import { createCountingEmbedder } from "../support/embed-fakes.ts";
 
+const EXAMPLES = join(import.meta.dirname, "..", "..", "examples", "docs");
 const NOW = Date.parse("2026-10-05T00:00:00Z");
 const KEY_ROTATION = "Rotate the gateway signing key every quarter.";
 
@@ -53,6 +54,59 @@ async function writeDocument(
   await writeFile(file, `---\n${header.join("\n")}\n---\n\n${body}\n`, "utf8");
 }
 
+describe("retrieve over examples/docs", () => {
+  let root: string;
+  let retrieve: ReturnType<typeof createRetriever>;
+
+  beforeAll(async () => {
+    root = await mkdtemp(join(tmpdir(), "md-rag-retrieve-examples-"));
+    retrieve = createRetriever({
+      index: await buildTestIndex(EXAMPLES, join(root, "engine")),
+      embedder: createCountingEmbedder(MODEL),
+      reranker: overlapReranker(),
+      now: () => NOW,
+    });
+  });
+
+  afterAll(async () => {
+    await rm(root, { recursive: true, force: true });
+  });
+
+  it("finds the document holding an exact error code in keyword mode", async () => {
+    const { results } = await retrieve({
+      query: "ERR_WEBHOOK_TIMEOUT_504",
+      mode: "keyword",
+    });
+
+    expect(["api/webhooks.md", "api/errors-reference.md"]).toContain(
+      results[0]?.summary.path,
+    );
+  });
+
+  it("returns at most the requested number of results, each document within its cap", async () => {
+    const { results } = await retrieve({
+      query: "webhook signature",
+      limit: 10,
+    });
+
+    expect(results.length).toBeGreaterThan(0);
+    expect(results.length).toBeLessThanOrEqual(10);
+    const paths = results.map((r) => r.summary.path);
+    for (const path of new Set(paths)) {
+      expect(paths.filter((p) => p === path).length).toBeLessThanOrEqual(2);
+    }
+  });
+
+  it("orders results by final score within each rank class", async () => {
+    const { results } = await retrieve({ query: "rotate api keys", limit: 10 });
+
+    const finals = results.map((r) => r.scores.final);
+    expect(finals).toEqual([...finals].sort((a, b) => b - a));
+  });
+});
+
+// Bespoke fixtures: the recency and signal cases need two documents with identical text that differ
+// only in `updated_at` or a declared signal, which `examples/docs` has no pair for.
 describe("retrieve", () => {
   let root: string;
   let index: KnowledgeIndex;
