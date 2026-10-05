@@ -72,6 +72,18 @@ describe("createPairFitter", () => {
     expect(fitter.fitPassage(words(100))).toBe(words(27));
   });
 
+  it("has no fitted passage when the tokenizer finds no token in it", () => {
+    const fitter = createPairFitter(wordTokenizer(), "q", 512);
+    // The fake tokenizer drops whitespace, as a real one drops characters it strips.
+    expect(fitter.fitPassage("  ")).toBeUndefined();
+  });
+
+  it("refuses a query the tokenizer finds no token in", () => {
+    expect(() => createPairFitter(wordTokenizer(), " ", 512)).toThrow(
+      /no token/,
+    );
+  });
+
   it("refuses a window with no room for a passage", () => {
     expect(() => createPairFitter(wordTokenizer(), "q", 3)).toThrow(
       /no room for a passage/,
@@ -82,7 +94,7 @@ describe("createPairFitter", () => {
     // Joining with " - " makes n kept words re-encode to 2n - 1 tokens.
     const tokenizer = wordTokenizer({ joiner: " - " });
     const fitter = createPairFitter(tokenizer, "q", 14);
-    const fitted = fitter.fitPassage(words(50));
+    const fitted = fitter.fitPassage(words(50)) ?? "";
     // 14 - 3 special - 1 query token
     expect(
       tokenizer.encode(fitted, { add_special_tokens: false }),

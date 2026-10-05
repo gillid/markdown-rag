@@ -135,6 +135,20 @@ describe("transformers reranker", () => {
   );
 
   it(
+    "gives null to a passage the tokenizer strips to nothing and still scores the rest",
+    async () => {
+      const scores = await rerankerFor().rerank("rotate api keys", [
+        "Rotate API keys from the dashboard.",
+        "\u200b\u200b\u200b",
+        "Lunch is served at noon.",
+      ]);
+      expect(scores[1]).toBeNull();
+      expect(scores[0]).toBeGreaterThan(scores[2] ?? Number.NaN);
+    },
+    TIMEOUT,
+  );
+
+  it(
     "rejects an empty query instead of scoring noise",
     async () => {
       const failure = rerankerFor().rerank("  ", ["A real passage."]);

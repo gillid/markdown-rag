@@ -1,7 +1,10 @@
 export interface Reranker {
   readonly modelId: string;
-  /** Raw relevance logits, one per passage and in the same order; higher is more relevant. */
-  rerank(query: string, passages: readonly string[]): Promise<number[]>;
+  /** Raw relevance logits, one per passage and in the same order; higher is more relevant. A passage with no token the model can score gets null rather than failing the rest. */
+  rerank(
+    query: string,
+    passages: readonly string[],
+  ): Promise<(number | null)[]>;
 }
 
 export class RerankerError extends Error {
