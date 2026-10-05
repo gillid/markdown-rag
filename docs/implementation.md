@@ -124,14 +124,17 @@ Status: `planned` · `in-progress` · `done`
 - In `keyword` mode the query embedding is skipped.
 - **Tests:** an exact error-code query finds its document in `keyword` mode, and filters narrow results in every mode, using sidecars from a fake embedder. A `*.models.test.ts` embeds `examples/docs` into a temporary `targetDir` and checks that a paraphrase query finds its document in `semantic` mode (sidecars are not committed, so there are no real vectors to reuse, ADR-038).
 
-### 15. Reranker · `planned`
+### 15. Reranker · `done`
 
-- A `Reranker` interface and a transformers.js implementation (`AutoTokenizer` and `AutoModelForSequenceClassification`), which scores `(query, breadcrumb + text)` pairs in a single batch, truncating to 512 tokens.
-- **Tests:** a `*.models.test.ts` checks that a relevant passage outscores an irrelevant one.
+- A `Reranker` interface (`rerank(query, passages)` returns one raw logit per passage, `modelId`) and a transformers.js implementation (`AutoTokenizer` and `AutoModelForSequenceClassification`, q8, pinned revision, ADR-010), which scores `(query, breadcrumb + text)` pairs, 32 per model call. A score that is not finite is an error. It shares the model cache setup with the embedder (`ensureEngineDir` and the `.gitignore` handling, ADR-022, ADR-031).
+- Each pair fits the preset's `maxTokens` (512), counting the pair's special tokens, whose number is read from the tokenizer rather than assumed. transformers.js truncates by slicing the whole sequence, which drops the closing `[SEP]` and lets a long query cut the passage away, so the query is first capped at 128 tokens (or a quarter of the window, if smaller) and each passage is cut to the budget left, re-checked after decoding. A window with no budget left, and an empty passage (which the tokenizer would treat as no pair and score as the bare query), are errors. The window is the preset's `maxTokens`, and the embedder and reranker load through one shared `hubModel`.
+- A model that can't be loaded fails with `RerankerUnavailableError`; any other failure while scoring is a `RerankerError`.
+- **Tests:** a `*.models.test.ts` checks that a relevant passage outscores an irrelevant one, including with a very long query and over-long passages. The budget arithmetic is unit-tested with a fake tokenizer.
 
 ### 16. Retrieval pipeline · `planned`
 
 - `retrieve(request)` runs these stages in order: embed the query (unless `mode` is `keyword`) → take K=30 candidates → cap at 2 chunks per document → rerank (unless disabled) → apply the signal blend → apply `min_score` → take the top `limit` → merge and expand (ADR-012, ADR-013, ADR-027, ADR-034).
+- **Rerank input check:** `Reranker.rerank` throws on a chunk it can't score: one that is empty after trimming, or that the tokenizer can't encode at all (for example text that is all `[UNK]`, which is cut to nothing). Check chunks before reranking and keep those out of the rerank input. Whether such a chunk keeps its retrieval score and ranks after the reranked ones, or is dropped, is decided when implementing the step.
 - **Signal blend:** `final = (1 − Σwᵢ)·σ(rerank) + Σ wᵢ·sᵢ`, where `recency` is computed from `updated_at` and the other signals come from frontmatter, with 0 for a signal a document doesn't declare. Weights are validated: each in [0, 1], summing to at most 0.5, and only for `recency` or a signal some document declares (ADR-034).
 - **Merge and expand:** consecutive hits from the same document are merged into one result, which keeps the higher score. Each result is then extended with `expand` neighbouring chunks on each side from the per-document chunk lookup. Chunks never overlap, so they are joined without trimming (ADR-011).
 - Each request can override `mode`, `limit` (max 10), `min_score`, `weights`, `expand` (max 2) and the filter. Config supplies the defaults (`weights` defaults to `{ recency: 0.15 }`), plus K, `half_life_days`, the hybrid weights and `rerank` (on or off).
