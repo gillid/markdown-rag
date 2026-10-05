@@ -63,7 +63,7 @@ export function validateOptions(options: {
   requireInteger("limit", options.limit, 1, MAX_LIMIT);
   requireInteger("expand", options.expand, 0, MAX_EXPAND);
   if (!Number.isFinite(options.minScore)) {
-    throw new RangeError(`min_score must be finite, got ${options.minScore}`);
+    throw new RangeError(`minScore must be finite, got ${options.minScore}`);
   }
 }
 
@@ -74,6 +74,6 @@ export function validateDefaults(
   validateWeights(defaults.weights, declaredSignals);
   requireInteger("candidates", defaults.candidates, 1, Number.MAX_SAFE_INTEGER);
   validateOptions(defaults);
-  requirePositive("half_life_days", defaults.halfLifeDays);
+  requirePositive("halfLifeDays", defaults.halfLifeDays);
   validateHybridWeights(defaults.hybridWeights);
 }

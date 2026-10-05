@@ -345,7 +345,7 @@ describe("retrieve", () => {
     [{ query: "key", limit: 11 }, "limit"],
     [{ query: "key", limit: 0 }, "limit"],
     [{ query: "key", expand: 3 }, "expand"],
-    [{ query: "key", minScore: Number.NaN }, "min_score"],
+    [{ query: "key", minScore: Number.NaN }, "minScore"],
   ])("rejects %j", async (request, message) => {
     await expect(retriever(constantReranker())(request)).rejects.toThrow(
       message,
@@ -353,8 +353,8 @@ describe("retrieve", () => {
   });
 
   it.each([
-    [{ halfLifeDays: 0 }, "half_life_days"],
-    [{ minScore: Number.NaN }, "min_score"],
+    [{ halfLifeDays: 0 }, "halfLifeDays"],
+    [{ minScore: Number.NaN }, "minScore"],
     [{ limit: 11 }, "limit"],
     [{ hybridWeights: { text: 0, vector: 1 } }, "hybrid weight"],
   ])("rejects the configured defaults %j", (defaults, message) => {
