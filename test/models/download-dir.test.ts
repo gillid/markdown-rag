@@ -1,7 +1,7 @@
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { prepareDownloadDir } from "../../src/models/download-dir.ts";
 
 describe("prepareDownloadDir", () => {
@@ -41,6 +41,53 @@ describe("prepareDownloadDir", () => {
     const second = prepareDownloadDir(configFor());
     expect(second).not.toBe(first);
     await Promise.all([first, second]);
+  });
+
+  describe("warnings", () => {
+    // Stubbed so the expected warnings don't print into the test run.
+    async function warningsDuring(run: () => Promise<void>): Promise<string> {
+      const emitWarning = vi
+        .spyOn(process, "emitWarning")
+        .mockImplementation(() => {});
+      try {
+        await run();
+        return emitWarning.mock.calls
+          .map(([warning]) => String(warning))
+          .join("\n");
+      } finally {
+        emitWarning.mockRestore();
+      }
+    }
+
+    it("warns about a shared cache with its own .gitignore and leaves it alone", async () => {
+      const modelsDir = join(root, `own-gitignore-${scenario++}`);
+      await mkdir(modelsDir, { recursive: true });
+      await writeFile(join(modelsDir, ".gitignore"), "*.tmp\n");
+      const warnings = await warningsDuring(() =>
+        prepareDownloadDir({
+          targetDir: join(root, `engine-${scenario++}`),
+          modelsDir,
+          allowRemoteModels: true,
+        }),
+      );
+      expect(warnings).toContain(`${modelsDir} has its own .gitignore`);
+      expect(await readFile(join(modelsDir, ".gitignore"), "utf8")).toBe(
+        "*.tmp\n",
+      );
+    });
+
+    it("warns instead of failing when the folder can't be prepared", async () => {
+      const targetDir = join(root, `not-a-folder-${scenario++}`);
+      await writeFile(targetDir, "a file, not a folder");
+      const warnings = await warningsDuring(() =>
+        prepareDownloadDir({
+          targetDir,
+          modelsDir: join(targetDir, "models"),
+          allowRemoteModels: true,
+        }),
+      );
+      expect(warnings).toContain("Could not prepare");
+    });
   });
 
   it("runs again once the previous run has finished", async () => {
