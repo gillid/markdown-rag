@@ -2,26 +2,51 @@ import type { PreTrainedTokenizer } from "@huggingface/transformers";
 
 type PairTokenizer = Pick<PreTrainedTokenizer, "encode" | "decode">;
 
-// [CLS] query [SEP] passage [SEP]
-const PAIR_SPECIAL_TOKENS = 3;
 const MAX_QUERY_TOKENS = 128;
+const specialTokenCounts = new WeakMap<PairTokenizer, number>();
 
-// The tokenizer's own truncation slices the whole pair, dropping the closing [SEP] and letting a long query cut the passage away.
-export function fitPair(
+export interface PairFitter {
+  query: string;
+  fitPassage(passage: string): string;
+}
+
+// The tokenizer's own truncation slices the whole pair, dropping the closing separator and letting a long query cut the passage away.
+export function createPairFitter(
   tokenizer: PairTokenizer,
   query: string,
-  passages: readonly string[],
   maxTokens: number,
-): { query: string; passages: string[] } {
-  const fittedQuery = truncateText(tokenizer, query, MAX_QUERY_TOKENS);
+): PairFitter {
+  // A query may take at most a quarter of a small window, so passages always keep room.
+  const maxQueryTokens = Math.min(MAX_QUERY_TOKENS, Math.floor(maxTokens / 4));
+  const fittedQuery = truncateText(tokenizer, query, maxQueryTokens);
   const budget =
-    maxTokens - PAIR_SPECIAL_TOKENS - countTokens(tokenizer, fittedQuery);
+    maxTokens -
+    specialTokenCount(tokenizer) -
+    countTokens(tokenizer, fittedQuery);
+  if (budget <= 0) {
+    throw new Error(
+      `A ${maxTokens}-token window leaves no room for a passage after the query and special tokens.`,
+    );
+  }
   return {
     query: fittedQuery,
-    passages: passages.map((passage) =>
-      truncateText(tokenizer, passage, budget),
-    ),
+    fitPassage: (passage) => truncateText(tokenizer, passage, budget),
   };
+}
+
+// Differs per model family (BERT pairs take 3, XLM-R pairs 4); an empty text_pair counts as no pair, so probe with real text.
+function specialTokenCount(tokenizer: PairTokenizer): number {
+  let count = specialTokenCounts.get(tokenizer);
+  if (count === undefined) {
+    const probe = "a";
+    const pair = tokenizer.encode(probe, {
+      text_pair: probe,
+      add_special_tokens: true,
+    });
+    count = pair.length - 2 * countTokens(tokenizer, probe);
+    specialTokenCounts.set(tokenizer, count);
+  }
+  return count;
 }
 
 function countTokens(tokenizer: PairTokenizer, text: string): number {
@@ -33,10 +58,6 @@ function truncateText(
   text: string,
   maxTokens: number,
 ): string {
-  // A token spans at least one character, so short text can't exceed the budget.
-  if (text.length <= maxTokens) {
-    return text;
-  }
   const ids = tokenizer.encode(text, { add_special_tokens: false });
   if (ids.length <= maxTokens) {
     return text;

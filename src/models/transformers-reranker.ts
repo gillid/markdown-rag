@@ -3,9 +3,10 @@ import type {
   PreTrainedTokenizer,
 } from "@huggingface/transformers";
 import { errorMessage } from "../errors.ts";
-import { type ModelsConfig, prepareDownloadDir } from "./download-dir.ts";
-import { fitPair } from "./fit-pair.ts";
-import { lazyModel, offlineModelMissingMessage } from "./lazy-model.ts";
+import type { ModelsConfig } from "./download-dir.ts";
+import { createPairFitter, type PairFitter } from "./fit-pair.ts";
+import { inBatches } from "./in-batches.ts";
+import { hubModel } from "./model-loader.ts";
 import { DEFAULT_RERANKER_PRESET, type RerankerPreset } from "./presets.ts";
 import {
   type Reranker,
@@ -13,7 +14,6 @@ import {
   RerankerUnavailableError,
 } from "./reranker.ts";
 
-const MAX_TOKENS = 512;
 const BATCH_SIZE = 32;
 
 interface LoadedReranker {
@@ -25,28 +25,59 @@ export function createTransformersReranker(
   config: ModelsConfig,
   preset: RerankerPreset = DEFAULT_RERANKER_PRESET,
 ): Reranker {
-  const load = lazyModel(
+  const load = hubModel(
+    config,
     preset,
-    () => loadReranker(config, preset),
-    (error) => error instanceof RerankerUnavailableError,
-    (message, cause) => new RerankerUnavailableError(message, { cause }),
+    RerankerUnavailableError,
+    async (
+      {
+        AutoTokenizer,
+        AutoModelForSequenceClassification,
+        ModelFileNotFoundError,
+      },
+      options,
+    ) => {
+      // Both settle before a failure is reported, so a retry never overlaps a download still in flight.
+      const [tokenizer, model] = await Promise.allSettled([
+        AutoTokenizer.from_pretrained(preset.repository, options),
+        AutoModelForSequenceClassification.from_pretrained(preset.repository, {
+          ...options,
+          dtype: "q8",
+        }),
+      ]);
+      if (tokenizer.status === "fulfilled" && model.status === "fulfilled") {
+        return { tokenizer: tokenizer.value, model: model.value };
+      }
+      const failures: unknown[] = [tokenizer, model].flatMap((result) =>
+        result.status === "rejected" ? [result.reason] : [],
+      );
+      // A missing file is the actionable failure, so it wins over any other.
+      throw (
+        failures.find((reason) => reason instanceof ModelFileNotFoundError) ??
+        failures[0]
+      );
+    },
   );
 
   const scoreBatch = async (
-    query: string,
+    { tokenizer, model }: LoadedReranker,
+    fitter: PairFitter,
     passages: readonly string[],
   ): Promise<number[]> => {
-    const { tokenizer, model } = await load();
-    const scores = await infer(tokenizer, model, query, passages).catch(
-      (error: unknown) => {
-        throw error instanceof RerankerError
-          ? error
-          : new RerankerError(
-              `${preset.id} failed to score ${passages.length} passages: ${errorMessage(error)}`,
-              { cause: error },
-            );
-      },
-    );
+    const scores = await infer(
+      tokenizer,
+      model,
+      fitter,
+      passages,
+      preset.maxTokens,
+    ).catch((error: unknown) => {
+      throw error instanceof RerankerError
+        ? error
+        : new RerankerError(
+            `${preset.id} failed to score ${passages.length} passages: ${errorMessage(error)}`,
+            { cause: error },
+          );
+    });
     if (!(scores instanceof Float32Array)) {
       throw new RerankerError(`${preset.id} did not return float32 scores.`);
     }
@@ -64,13 +95,34 @@ export function createTransformersReranker(
   return {
     modelId: preset.id,
     async rerank(query, passages) {
-      const scores: number[] = [];
-      for (let i = 0; i < passages.length; i += BATCH_SIZE) {
-        scores.push(
-          ...(await scoreBatch(query, passages.slice(i, i + BATCH_SIZE))),
+      if (passages.length === 0) {
+        return [];
+      }
+      if (typeof query !== "string" || query.trim() === "") {
+        throw new RerankerError(`${preset.id} can't score an empty query.`);
+      }
+      // An empty passage would be tokenized as no pair and score as the bare query.
+      const empty = passages.findIndex(
+        (passage) => typeof passage !== "string" || passage.trim() === "",
+      );
+      if (empty >= 0) {
+        throw new RerankerError(
+          `${preset.id} can't score an empty passage (passage ${empty}).`,
         );
       }
-      return scores;
+      const loaded = await load();
+      let fitter: PairFitter;
+      try {
+        fitter = createPairFitter(loaded.tokenizer, query, preset.maxTokens);
+      } catch (error) {
+        throw new RerankerError(
+          `${preset.id} could not fit the query into its window: ${errorMessage(error)}`,
+          { cause: error },
+        );
+      }
+      return inBatches(passages, BATCH_SIZE, (batch) =>
+        scoreBatch(loaded, fitter, batch),
+      );
     },
   };
 }
@@ -78,58 +130,23 @@ export function createTransformersReranker(
 async function infer(
   tokenizer: PreTrainedTokenizer,
   model: PreTrainedModel,
-  query: string,
+  fitter: PairFitter,
   passages: readonly string[],
+  maxTokens: number,
 ): Promise<unknown> {
-  const fitted = fitPair(tokenizer, query, passages, MAX_TOKENS);
+  const fitted = passages.map(fitter.fitPassage);
+  if (fitted.some((passage) => passage === "")) {
+    throw new RerankerError("A passage was cut to nothing to fit the window.");
+  }
   const inputs = tokenizer(
-    new Array<string>(passages.length).fill(fitted.query),
+    new Array<string>(passages.length).fill(fitter.query),
     {
-      text_pair: fitted.passages,
+      text_pair: fitted,
       padding: true,
       truncation: true,
-      max_length: MAX_TOKENS,
+      max_length: maxTokens,
     },
   );
   const { logits } = await model(inputs);
   return logits.data;
-}
-
-async function loadReranker(
-  config: ModelsConfig,
-  preset: RerankerPreset,
-): Promise<LoadedReranker> {
-  // Offline loading never writes, so read-only mounts keep working.
-  if (config.allowRemoteModels) {
-    await prepareDownloadDir(config);
-  }
-  // Imported here so commands that never rerank don't load the native onnxruntime binding.
-  const {
-    AutoTokenizer,
-    AutoModelForSequenceClassification,
-    ModelFileNotFoundError,
-  } = await import("@huggingface/transformers");
-  const options = {
-    revision: preset.revision,
-    cache_dir: config.modelsDir,
-    local_files_only: !config.allowRemoteModels,
-  };
-  try {
-    const [tokenizer, model] = await Promise.all([
-      AutoTokenizer.from_pretrained(preset.repository, options),
-      AutoModelForSequenceClassification.from_pretrained(preset.repository, {
-        ...options,
-        dtype: "q8",
-      }),
-    ]);
-    return { tokenizer, model };
-  } catch (error) {
-    if (!config.allowRemoteModels && error instanceof ModelFileNotFoundError) {
-      throw new RerankerUnavailableError(
-        offlineModelMissingMessage(preset, config),
-        { cause: error },
-      );
-    }
-    throw error;
-  }
 }

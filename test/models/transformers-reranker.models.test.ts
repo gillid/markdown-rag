@@ -1,8 +1,11 @@
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { AutoTokenizer } from "@huggingface/transformers";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { loadConfig } from "../../src/config/config.ts";
+import { createPairFitter } from "../../src/models/fit-pair.ts";
+import { DEFAULT_RERANKER_PRESET } from "../../src/models/presets.ts";
 import { RerankerError } from "../../src/models/reranker.ts";
 import { createTransformersReranker } from "../../src/models/transformers-reranker.ts";
 
@@ -93,11 +96,60 @@ describe("transformers reranker", () => {
   );
 
   it(
-    "wraps scoring failures in RerankerError",
+    "fits the longest pair into the model's window with both separators intact",
     async () => {
-      const reranker = rerankerFor();
-      await reranker.rerank("warm", ["up"]);
-      const failure = reranker.rerank("q", [undefined as unknown as string]);
+      const tokenizer = await AutoTokenizer.from_pretrained(
+        DEFAULT_RERANKER_PRESET.repository,
+        {
+          revision: DEFAULT_RERANKER_PRESET.revision,
+          cache_dir: join(root, "models"),
+        },
+      );
+      const query = "how do I rotate the production API keys? ".repeat(200);
+      const fitter = createPairFitter(
+        tokenizer,
+        query,
+        DEFAULT_RERANKER_PRESET.maxTokens,
+      );
+      const pair = tokenizer.encode(fitter.query, {
+        text_pair: fitter.fitPassage("rotate the keys regularly. ".repeat(500)),
+      });
+      expect(pair).toHaveLength(DEFAULT_RERANKER_PRESET.maxTokens);
+      const separator = tokenizer.encode("", { add_special_tokens: true })[1];
+      expect(pair.filter((id) => id === separator)).toHaveLength(2);
+    },
+    TIMEOUT,
+  );
+
+  it(
+    "rejects an empty passage instead of scoring the bare query",
+    async () => {
+      const failure = rerankerFor().rerank("rotate api keys", [
+        "A real passage.",
+        "   ",
+      ]);
+      await expect(failure).rejects.toThrow(RerankerError);
+      await expect(failure).rejects.toThrow(/empty passage \(passage 1\)/);
+    },
+    TIMEOUT,
+  );
+
+  it(
+    "rejects an empty query instead of scoring noise",
+    async () => {
+      const failure = rerankerFor().rerank("  ", ["A real passage."]);
+      await expect(failure).rejects.toThrow(RerankerError);
+      await expect(failure).rejects.toThrow(/empty query/);
+    },
+    TIMEOUT,
+  );
+
+  it(
+    "rejects a passage that isn't a string with a RerankerError",
+    async () => {
+      const failure = rerankerFor().rerank("q", [
+        undefined as unknown as string,
+      ]);
       await expect(failure).rejects.toThrow(RerankerError);
     },
     TIMEOUT,
