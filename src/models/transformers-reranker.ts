@@ -61,13 +61,13 @@ export function createTransformersReranker(
 
   const scoreBatch = async (
     { tokenizer, model }: LoadedReranker,
-    fitter: PairFitter,
+    query: string,
     passages: readonly string[],
   ): Promise<number[]> => {
     const scores = await infer(
       tokenizer,
       model,
-      fitter,
+      query,
       passages,
       preset.maxTokens,
     ).catch((error: unknown) => {
@@ -120,8 +120,27 @@ export function createTransformersReranker(
           { cause: error },
         );
       }
-      return inBatches(passages, BATCH_SIZE, (batch) =>
-        scoreBatch(loaded, fitter, batch),
+      let fitted: (string | undefined)[];
+      try {
+        fitted = passages.map(fitter.fitPassage);
+      } catch (error) {
+        throw new RerankerError(
+          `${preset.id} failed to fit ${passages.length} passages: ${errorMessage(error)}`,
+          { cause: error },
+        );
+      }
+      const scorable = fitted.filter((p): p is string => p !== undefined);
+      const scores = await inBatches(scorable, BATCH_SIZE, (batch) =>
+        scoreBatch(loaded, fitter.query, batch),
+      );
+      if (scores.length !== scorable.length) {
+        throw new RerankerError(
+          `Expected ${scorable.length} scores from ${preset.id}, got ${scores.length}.`,
+        );
+      }
+      let scored = 0;
+      return fitted.map((passage) =>
+        passage === undefined ? null : (scores[scored++] ?? null),
       );
     },
   };
@@ -130,18 +149,14 @@ export function createTransformersReranker(
 async function infer(
   tokenizer: PreTrainedTokenizer,
   model: PreTrainedModel,
-  fitter: PairFitter,
-  passages: readonly string[],
+  query: string,
+  fittedPassages: readonly string[],
   maxTokens: number,
 ): Promise<unknown> {
-  const fitted = passages.map(fitter.fitPassage);
-  if (fitted.some((passage) => passage === "")) {
-    throw new RerankerError("A passage was cut to nothing to fit the window.");
-  }
   const inputs = tokenizer(
-    new Array<string>(passages.length).fill(fitter.query),
+    new Array<string>(fittedPassages.length).fill(query),
     {
-      text_pair: fitted,
+      text_pair: [...fittedPassages],
       padding: true,
       truncation: true,
       max_length: maxTokens,
