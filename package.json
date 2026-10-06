@@ -6,6 +6,9 @@
   "type": "module",
   "private": true,
   "packageManager": "pnpm@10.18.3",
+  "exports": {
+    ".": "./src/engine/index.ts"
+  },
   "engines": {
     "node": ">=24"
   },
