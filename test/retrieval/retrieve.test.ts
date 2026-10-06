@@ -302,6 +302,31 @@ describe("retrieve", () => {
     expect(one.results).toHaveLength(1);
   });
 
+  describe("min_score", () => {
+    const request = {
+      query: "gateway signing key",
+      mode: "keyword" as const,
+      minScore: 0.1,
+    };
+
+    it("cuts on relevance, so a fresh document cannot be carried over it by its signals alone", async () => {
+      // Relevance is sigmoid(-20), about 2e-9. Fresh scores 0.15 * 0.89 = 0.134 on recency alone, above 0.1.
+      const { results } = await retriever(constantReranker(-20))(request);
+
+      expect(results).toEqual([]);
+    });
+
+    it("keeps results whose relevance clears it", async () => {
+      // Relevance is sigmoid(0) = 0.5.
+      const { results } = await retriever(constantReranker(0))(request);
+
+      expect(results.map((r) => r.summary.path)).toEqual([
+        "fresh.md",
+        "stale.md",
+      ]);
+    });
+  });
+
   it("expands a hit with its neighbouring chunks and stops at the document's edges", async () => {
     const run = retriever(overlapReranker());
 
@@ -447,7 +472,7 @@ describe("retrieve", () => {
         embedder: createCountingEmbedder({ modelId: "other-model", dims: 384 }),
         reranker: constantReranker(),
       }),
-    ).toThrow("bge-small-en-v1.5 but the embedder is other-model");
+    ).toThrow("bge-small-en-v1.5-q8 but the embedder is other-model");
   });
 
   it("requires a reranker while rerank is on", () => {

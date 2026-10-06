@@ -8,6 +8,8 @@ const preset: ModelPreset = {
   id: "test-model",
   repository: "org/test-model",
   revision: "abc123",
+  dtype: "q8",
+  maxTokens: 512,
 };
 
 describe("lazyModel", () => {

@@ -9,6 +9,13 @@ export function matchesDocument(
   return header.docHash === docHash;
 }
 
+export function matchesChunker(
+  header: SidecarHeader,
+  chunkerId: string,
+): boolean {
+  return header.chunker === chunkerId;
+}
+
 export function matchesModel(
   header: SidecarHeader,
   model: Pick<Embedder, "modelId" | "dims">,

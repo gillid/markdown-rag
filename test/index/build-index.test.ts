@@ -18,7 +18,7 @@ import {
 
 const EXAMPLES = join(import.meta.dirname, "..", "..", "examples", "docs");
 // A fake embedder must carry a preset's ID and dims for the freshness check to accept it.
-const MODEL = { modelId: "bge-small-en-v1.5", dims: 384 };
+const MODEL = { modelId: "bge-small-en-v1.5-q8", dims: 384 };
 
 describe("buildIndex", () => {
   let root: string;

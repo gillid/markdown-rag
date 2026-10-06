@@ -46,6 +46,7 @@ export interface RetrieveRequest {
   filter?: Filter;
   mode?: SearchMode;
   limit?: number;
+  /** A cutoff on `relevance`, never on `final`; without a reranker that is relative to the best candidate, so the top hit always has 1. */
   minScore?: number;
   /** Merged over the configured weights, key by key. */
   weights?: SignalWeights;

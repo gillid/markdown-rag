@@ -45,7 +45,12 @@ const SAMPLE = [
 
 describe("createStructuralChunker", () => {
   it("identifies itself for the sidecar", () => {
-    expect(createStructuralChunker().id).toBe("structural@1");
+    expect(createStructuralChunker().id).toBe(
+      "structural@1;target=1000;max=2000",
+    );
+    expect(createStructuralChunker({ targetChars: 40, maxChars: 90 }).id).toBe(
+      "structural@1;target=40;max=90",
+    );
   });
 
   it("starts a new chunk at every heading, even when the sections are tiny", async () => {

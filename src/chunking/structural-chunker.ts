@@ -4,6 +4,8 @@ import type { Chunker, ChunkSpan } from "./chunker.ts";
 import { splitOversized } from "./split-oversized.ts";
 
 export const DEFAULT_TARGET_CHARS = 1000;
+// Bump when the splitting rules change.
+const ALGORITHM_VERSION = 1;
 const MAX_TO_TARGET_RATIO = 2;
 const BREADCRUMB_SHARE = 0.25;
 
@@ -24,7 +26,8 @@ export function createStructuralChunker(
   const maxBreadcrumb = Math.floor(targetChars * BREADCRUMB_SHARE);
 
   return {
-    id: "structural@1",
+    // Everything that shapes the output is in the id, so a change invalidates recorded chunks.
+    id: `structural@${ALGORITHM_VERSION};target=${targetChars};max=${maxChars}`,
     async chunk({ title, body, tree }) {
       const blocks = splitOversized(toBlocks(tree), body, maxChars);
       const groups = packBlocks(blocks, targetChars);

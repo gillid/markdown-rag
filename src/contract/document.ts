@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { updatedAtSchema } from "./updated-at.ts";
 
 const RESERVED_SIGNAL_NAME = "recency";
 
@@ -17,7 +18,7 @@ const signalsSchema = z.record(signalNameSchema, z.number().min(0).max(1));
 const frontmatterSchema = z.object({
   title: z.string().min(1, "must not be empty"),
   source: z.string().min(1, "must not be empty"),
-  updated_at: z.coerce.date(),
+  updated_at: updatedAtSchema,
   url: z.string().min(1).optional(),
   tags: z.array(z.string()).optional(),
   signals: signalsSchema.optional(),
@@ -51,7 +52,7 @@ export function parseFrontmatterMetadata(raw: unknown): DocumentMetadata {
   return {
     title: parsed.title,
     source: parsed.source,
-    updatedAt: parsed.updated_at.getTime(),
+    updatedAt: parsed.updated_at,
     url: parsed.url,
     tags: parsed.tags ?? [],
     signals: parsed.signals ?? {},

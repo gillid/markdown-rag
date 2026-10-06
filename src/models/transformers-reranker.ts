@@ -42,7 +42,7 @@ export function createTransformersReranker(
         AutoTokenizer.from_pretrained(preset.repository, options),
         AutoModelForSequenceClassification.from_pretrained(preset.repository, {
           ...options,
-          dtype: "q8",
+          dtype: preset.dtype,
         }),
       ]);
       if (tokenizer.status === "fulfilled" && model.status === "fulfilled") {

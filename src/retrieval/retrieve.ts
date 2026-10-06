@@ -126,12 +126,8 @@ export function createRetriever(deps: RetrieverDeps) {
       };
     });
 
-    // A chunk the reranker couldn't score has no relevance, so signals alone must not carry it over a threshold.
-    const kept = scored.filter(
-      (hit) =>
-        hit.final >= minScore &&
-        (minScore <= 0 || hit.reranked || !defaults.rerank),
-    );
+    // The cutoff is on relevance: signals reorder relevant chunks and must never carry an irrelevant one over it (ADR-034, ADR-036).
+    const kept = scored.filter((hit) => hit.scores.relevance >= minScore);
 
     // `limit` counts results, so it applies after neighbouring hits have merged.
     const results = mergeAndExpand(kept, index.documents, expand)

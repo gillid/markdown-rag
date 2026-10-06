@@ -5,7 +5,7 @@ import { z } from "zod";
 import type { Config } from "../config/config.ts";
 import { errorMessage } from "../errors.ts";
 import { type DocumentMetadata, parseFrontmatterMetadata } from "./document.ts";
-import { hashDocument, normalizeLineEndings } from "./hash.ts";
+import { hashDocument, normalizeText } from "./hash.ts";
 import { parseDocument } from "./tree.ts";
 
 const MAX_FILE_SIZE_BYTES = 1024 * 1024;
@@ -80,7 +80,7 @@ async function loadDocument(file: string, path: string): Promise<Document> {
   }
 
   const raw = await readFile(file, "utf8");
-  const normalized = normalizeLineEndings(raw);
+  const normalized = normalizeText(raw);
   const docHash = hashDocument(normalized);
   const { frontmatter, body, tree } = parseDocument(normalized);
   const metadata = parseFrontmatterMetadata(frontmatter);

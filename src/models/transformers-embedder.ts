@@ -7,8 +7,10 @@ import {
 import { inBatches } from "./in-batches.ts";
 import { hubModel } from "./model-loader.ts";
 import { DEFAULT_EMBEDDING_PRESET, type EmbeddingPreset } from "./presets.ts";
+import { assertFitsWindow } from "./token-window.ts";
 
-const BATCH_SIZE = 32;
+// q8 output shifts slightly with batch padding, so one text per run keeps a stored vector independent of its neighbours (ADR-005, ADR-033).
+const DOCUMENT_BATCH_SIZE = 1;
 
 export function createTransformersEmbedder(
   config: ModelsConfig,
@@ -21,12 +23,13 @@ export function createTransformersEmbedder(
     ({ pipeline }, options) =>
       pipeline("feature-extraction", preset.repository, {
         ...options,
-        dtype: "q8",
+        dtype: preset.dtype,
       }),
   );
 
   const embedBatch = async (texts: string[]): Promise<Float32Array[]> => {
-    const output = await (await load())(texts, {
+    const extractor = await load();
+    const output = await extractor(texts, {
       pooling: "cls",
       normalize: true,
     });
@@ -47,9 +50,15 @@ export function createTransformersEmbedder(
   return {
     modelId: preset.id,
     dims: preset.dims,
-    embedDocuments: (texts) => inBatches(texts, BATCH_SIZE, embedBatch),
+    async embedDocuments(texts) {
+      // Checked up front, so one over-long text doesn't waste the embedding of those before it.
+      assertFitsWindow((await load()).tokenizer, texts, preset, "chunk");
+      return inBatches(texts, DOCUMENT_BATCH_SIZE, embedBatch);
+    },
     async embedQuery(text) {
-      const [vector] = await embedBatch([preset.queryPrefix + text]);
+      const prefixed = preset.queryPrefix + text;
+      assertFitsWindow((await load()).tokenizer, [prefixed], preset, "query");
+      const [vector] = await embedBatch([prefixed]);
       if (vector === undefined) {
         throw new EmbedderError(
           `${preset.id} returned no vector for the query.`,
