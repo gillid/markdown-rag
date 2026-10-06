@@ -2,8 +2,9 @@ import type { Chunker, ChunkSpan } from "../chunking/chunker.ts";
 import type { Document } from "../contract/loader.ts";
 import type { Embedder } from "../models/embedder.ts";
 import { chunkText, hashChunk } from "./chunk.ts";
-import { matchesDocument, matchesModel } from "./currency.ts";
-import type { Sidecar, SidecarHeader } from "./sidecar.ts";
+import { matchesChunker, matchesDocument, matchesModel } from "./currency.ts";
+import { type Sidecar, SidecarError, type SidecarHeader } from "./sidecar.ts";
+import { assertChunksCover, verifyChunks } from "./verify-chunks.ts";
 
 export interface PlannedChunk extends ChunkSpan {
   hash: string;
@@ -27,7 +28,31 @@ export interface SidecarPlan {
   pending: PendingChunk[];
 }
 
-/** The sidecar on disk; `load` decodes it in full and is only called when its chunks or vectors are reused. */
+// A sidecar that leaves text uncovered would be rejected by `check` and `serve`, so it is never written.
+function assertChunkerCovers(
+  doc: Document,
+  chunker: Chunker,
+  spans: readonly ChunkSpan[],
+): void {
+  try {
+    assertChunksCover(doc.body, spans);
+  } catch (cause) {
+    if (!(cause instanceof SidecarError)) throw cause;
+    throw new Error(`chunker ${chunker.id}: ${cause.message}`, { cause });
+  }
+}
+
+function chunksMatch(doc: Document, sidecar: Sidecar): boolean {
+  try {
+    verifyChunks(doc, sidecar);
+    return true;
+  } catch (cause) {
+    if (cause instanceof SidecarError) return false;
+    throw cause;
+  }
+}
+
+/** The sidecar on disk; `load` decodes it in full, and is undefined when its contents are invalid. */
 export interface PreviousSidecar {
   header: SidecarHeader;
   load(): Sidecar | undefined;
@@ -41,24 +66,32 @@ export interface PlanInput {
   rechunk: boolean;
 }
 
-/** Returns undefined when the sidecar is already fresh for this document and model (ADR-006, ADR-024, ADR-032). */
+/** Returns undefined when the sidecar is already fresh for this document, chunker and model (ADR-006, ADR-032, ADR-039). */
 export async function planSidecar(
   input: PlanInput,
 ): Promise<SidecarPlan | undefined> {
   const { doc, chunker, embedder, rechunk } = input;
   const header = input.previous?.header;
   const sameModel = header !== undefined && matchesModel(header, embedder);
+  const sameChunker =
+    header !== undefined && matchesChunker(header, chunker.id);
   const sameDocument =
     header !== undefined && matchesDocument(header, doc.docHash);
 
-  if (header && sameModel && sameDocument && !rechunk) {
+  // A header-fresh sidecar whose contents are damaged is rebuilt, never trusted.
+  const loaded = input.previous?.load();
+  const previous =
+    sameDocument && loaded && !chunksMatch(doc, loaded) ? undefined : loaded;
+
+  if (previous && sameModel && sameChunker && sameDocument && !rechunk) {
     return undefined;
   }
 
-  const previous = input.previous?.load();
-  // A model change alone re-embeds the recorded chunks; a chunker change alone invalidates nothing (ADR-024).
-  const keepRecordedChunks = previous !== undefined && sameDocument && !rechunk;
+  // A model change alone re-embeds the recorded chunks; a chunker change re-chunks (ADR-039).
+  const keepRecordedChunks =
+    previous !== undefined && sameDocument && sameChunker && !rechunk;
   const spans = keepRecordedChunks ? previous.chunks : await chunker.chunk(doc);
+  if (!keepRecordedChunks) assertChunkerCovers(doc, chunker, spans);
 
   // Vectors from another model are never reusable.
   const reusable = new Map<string, Float32Array>();
@@ -89,7 +122,7 @@ export async function planSidecar(
   return {
     path: doc.path,
     docHash: doc.docHash,
-    chunker: keepRecordedChunks ? previous.chunker : chunker.id,
+    chunker: chunker.id,
     model: embedder.modelId,
     dims: embedder.dims,
     chunks,

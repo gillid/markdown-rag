@@ -80,6 +80,7 @@ export function checkFreshness<E extends WithHeader>(
   }
 
   const model = checkSharedModel(current, problem);
+  checkSharedChunker(current, problem);
   for (const [path, header] of stale) {
     const builtWith =
       model && header.model !== model.modelId
@@ -115,6 +116,23 @@ function describeFailure(
   }
 }
 
+// The read path can't know which chunker `embed` was given, but sidecars from different ones must not be mixed (ADR-039).
+function checkSharedChunker(
+  headers: ReadonlyMap<string, SidecarHeader>,
+  problem: (path: string, reason: string) => unknown,
+): void {
+  const chunkerIds = [...new Set([...headers.values()].map((h) => h.chunker))];
+  chunkerIds.sort();
+  if (chunkerIds.length < 2) return;
+
+  for (const [path, header] of headers) {
+    problem(
+      path,
+      `sidecars record different chunkers (${chunkerIds.join(", ")}) and this one has ${header.chunker}; ${RUN_EMBED}`,
+    );
+  }
+}
+
 // Undefined when there are no sidecars or the shared model is unusable, which is reported as problems.
 function checkSharedModel(
   headers: ReadonlyMap<string, SidecarHeader>,
@@ -140,7 +158,7 @@ function checkSharedModel(
     for (const path of headers.keys()) {
       problem(
         path,
-        `the engine has no preset for the recorded model ${modelId}`,
+        `the engine has no preset for the recorded model ${modelId}; ${RUN_EMBED} to re-embed with the engine's model`,
       );
     }
     return undefined;

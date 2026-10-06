@@ -38,7 +38,7 @@ function makeSidecar(): Sidecar {
   return {
     docHash: DOC_HASH,
     chunker: "structural@1",
-    model: "bge-small-en-v1.5",
+    model: "bge-small-en-v1.5-q8",
     dims: 4,
     chunks: [
       {
@@ -65,7 +65,7 @@ const EXPECTED_JSON = `{
   "format": 1,
   "doc_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
   "chunker": "structural@1",
-  "model": "bge-small-en-v1.5",
+  "model": "bge-small-en-v1.5-q8",
   "dims": 4,
   "chunks": [
     {

@@ -5,7 +5,7 @@ import {
   type SidecarEntry,
 } from "../../src/sidecars/freshness.ts";
 
-const MODEL = "bge-small-en-v1.5";
+const MODEL = "bge-small-en-v1.5-q8";
 
 function doc(path: string, docHash: string): Document {
   // Freshness reads only the path and hash.
@@ -14,12 +14,12 @@ function doc(path: string, docHash: string): Document {
 
 function fresh(
   docHash: string,
-  overrides: { model?: string; dims?: number } = {},
+  overrides: { model?: string; dims?: number; chunker?: string } = {},
 ): SidecarEntry {
   return {
     header: {
       docHash,
-      chunker: "paragraphs@1",
+      chunker: overrides.chunker ?? "paragraphs@1",
       model: overrides.model ?? MODEL,
       dims: overrides.dims ?? 384,
     },
@@ -46,6 +46,35 @@ describe("checkFreshness", () => {
     expect(result).toMatchObject({
       ok: true,
       model: { modelId: MODEL, dims: 384 },
+    });
+  });
+
+  it("reports every current sidecar when they record different chunkers", () => {
+    const result = checkFreshness(
+      knowledgeBase([doc("a.md", "h-a"), doc("b.md", "h-b")]),
+      new Map([
+        [
+          "a.md",
+          fresh("h-a", { chunker: "structural@2;target=1000;max=2000" }),
+        ],
+        ["b.md", fresh("h-b", { chunker: "structural@2;target=500;max=1000" })],
+      ]),
+    );
+
+    expect(result).toEqual({
+      ok: false,
+      problems: [
+        {
+          path: "a.md",
+          reason:
+            "sidecars record different chunkers (structural@2;target=1000;max=2000, structural@2;target=500;max=1000) and this one has structural@2;target=1000;max=2000; run md-rag embed",
+        },
+        {
+          path: "b.md",
+          reason:
+            "sidecars record different chunkers (structural@2;target=1000;max=2000, structural@2;target=500;max=1000) and this one has structural@2;target=500;max=1000; run md-rag embed",
+        },
+      ],
     });
   });
 
@@ -223,7 +252,7 @@ describe("checkFreshness", () => {
         {
           path: "a.md",
           reason:
-            "the engine has no preset for the recorded model unknown-model",
+            "the engine has no preset for the recorded model unknown-model; run md-rag embed to re-embed with the engine's model",
         },
       ],
     });

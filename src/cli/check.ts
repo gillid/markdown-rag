@@ -1,10 +1,15 @@
 import { parseArgs } from "node:util";
 import { formatPathErrors } from "../contract/format-errors.ts";
-import { type KnowledgeBase, loadKnowledgeBase } from "../contract/loader.ts";
+import {
+  type DocumentLoadError,
+  type KnowledgeBase,
+  loadKnowledgeBase,
+} from "../contract/loader.ts";
 import { errorMessage, isErrnoException } from "../errors.ts";
 import { checkFreshness } from "../sidecars/freshness.ts";
 import { readSidecarEntries } from "../sidecars/read-entries.ts";
 import { SidecarError } from "../sidecars/sidecar.ts";
+import { verifySidecars } from "../sidecars/verify-chunks.ts";
 import { loadConfigOutcome } from "./load-config.ts";
 import { type CliResult, usageError } from "./result.ts";
 
@@ -93,6 +98,15 @@ type SidecarOutcome =
   | { ok: true; summary: string }
   | { ok: false; problem: string };
 
+function sidecarProblems(
+  problems: readonly DocumentLoadError[],
+): SidecarOutcome {
+  return {
+    ok: false,
+    problem: `${formatPathErrors(problems)}\n\n${new Set(problems.map((p) => p.path)).size} path(s) with sidecar problems.`,
+  };
+}
+
 // Failures are returned rather than thrown so the contract errors found earlier are still reported.
 async function checkSidecars(
   knowledgeBase: KnowledgeBase,
@@ -103,12 +117,9 @@ async function checkSidecars(
       knowledgeBase,
       await readSidecarEntries(targetDir, knowledgeBase),
     );
-    if (!freshness.ok) {
-      return {
-        ok: false,
-        problem: `${formatPathErrors(freshness.problems)}\n\n${new Set(freshness.problems.map((p) => p.path)).size} path(s) with sidecar problems.`,
-      };
-    }
+    if (!freshness.ok) return sidecarProblems(freshness.problems);
+    const damaged = verifySidecars(freshness.documents);
+    if (damaged.length > 0) return sidecarProblems(damaged);
     return {
       ok: true,
       summary: freshness.model

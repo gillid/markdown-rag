@@ -2,6 +2,7 @@ import {
   access,
   mkdir,
   mkdtemp,
+  readFile,
   rename,
   rm,
   writeFile,
@@ -21,7 +22,7 @@ import {
 } from "../support/embed-fakes.ts";
 
 const EXAMPLES = join(import.meta.dirname, "..", "..", "examples", "docs");
-const MODEL_ID = "bge-small-en-v1.5";
+const MODEL_ID = "bge-small-en-v1.5-q8";
 
 // Windows and macOS resolve a renamed document's old and new spelling to one sidecar file; Linux does not.
 const caseInsensitiveFs = await detectCaseInsensitiveFs();
@@ -83,6 +84,48 @@ describe("md-rag check", () => {
       exitCode: 0,
       stdout: `30 document(s) passed the contract; sidecars are fresh (model ${MODEL_ID}).\n`,
       stderr: "",
+    });
+  });
+
+  describe("a sidecar whose header is fresh but whose contents are damaged", () => {
+    async function checkAfterDamage(
+      damage: (sidecar: { chunks: Record<string, unknown>[] }) => void,
+    ) {
+      const sourceDir = join(root, "kb");
+      await writeDoc(sourceDir, "a.md", ["alpha"]);
+      await embedWithFakeModel(sourceDir, targetDir);
+      const path = join(targetDir, "vectors", "a.md.vec.json");
+      const sidecar = JSON.parse(await readFile(path, "utf8"));
+      damage(sidecar);
+      await writeFile(path, JSON.stringify(sidecar));
+      return run([
+        "check",
+        "--source-dir",
+        sourceDir,
+        "--target-dir",
+        targetDir,
+      ]);
+    }
+
+    it("exits 1 when a chunk no longer matches the document text", async () => {
+      const result = await checkAfterDamage((sidecar) => {
+        sidecar.chunks[0].hash = "0".repeat(64);
+      });
+
+      expect(result.exitCode).toBe(1);
+      expect(result.stderr).toContain(
+        "invalid sidecar: chunk 0 does not match the document text; run md-rag embed",
+      );
+    });
+
+    it("exits 1 when a vector holds a non-finite value", async () => {
+      // 1,024 base64 characters decode to 384 float16 values; all-ones bits are NaN.
+      const result = await checkAfterDamage((sidecar) => {
+        sidecar.chunks[0].vector = "/".repeat(1024);
+      });
+
+      expect(result.exitCode).toBe(1);
+      expect(result.stderr).toContain("non-finite");
     });
   });
 

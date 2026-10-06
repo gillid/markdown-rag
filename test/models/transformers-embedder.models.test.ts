@@ -101,7 +101,7 @@ describe("transformers embedder", () => {
         expect(Math.hypot(...vector)).toBeCloseTo(1, 5);
       }
       expect(embedder.dims).toBe(384);
-      expect(embedder.modelId).toBe("bge-small-en-v1.5");
+      expect(embedder.modelId).toBe("bge-small-en-v1.5-q8");
     },
     TIMEOUT,
   );
@@ -117,9 +117,47 @@ describe("transformers embedder", () => {
         text,
       ])) as [Float32Array, Float32Array];
       const asQuery = await embedder.embedQuery(text);
-      // q8 output shifts slightly with batch padding, so compare closeness rather than equality.
-      expect(dot(asQuery, prefixed)).toBeGreaterThan(0.99);
+      expect(asQuery).toEqual(prefixed);
       expect(dot(asQuery, prefixed)).toBeGreaterThan(dot(asQuery, plain));
+    },
+    TIMEOUT,
+  );
+
+  it(
+    "gives a document the same vector whatever it is batched with",
+    async () => {
+      const { embedder } = embedderFor();
+      const text = "Rotate the API keys.";
+      const [alone] = await embedder.embedDocuments([text]);
+      const [withNeighbour] = await embedder.embedDocuments([
+        text,
+        "A much longer neighbouring passage about rotating keys. ".repeat(20),
+      ]);
+      expect(withNeighbour).toEqual(alone);
+    },
+    TIMEOUT,
+  );
+
+  it(
+    "rejects a query past the model's window, advising about the query",
+    async () => {
+      const { embedder } = embedderFor();
+      const tooLong = "rotate ".repeat(DEFAULT_EMBEDDING_PRESET.maxTokens);
+      await expect(embedder.embedQuery(tooLong)).rejects.toThrow(
+        /The query is \d+ tokens, over the 512-token window/,
+      );
+    },
+    TIMEOUT,
+  );
+
+  it(
+    "rejects a chunk past the model's window instead of truncating it",
+    async () => {
+      const { embedder } = embedderFor();
+      const tooLong = "rotate ".repeat(DEFAULT_EMBEDDING_PRESET.maxTokens);
+      await expect(embedder.embedDocuments([tooLong])).rejects.toThrow(
+        /A chunk of \d+ tokens .* exceeds the 512-token window/,
+      );
     },
     TIMEOUT,
   );

@@ -7,13 +7,14 @@ import type {
   KnowledgeBase,
 } from "../contract/loader.ts";
 import { errorMessage } from "../errors.ts";
-import { chunkText, hashChunk } from "../sidecars/chunk.ts";
+import { chunkText } from "../sidecars/chunk.ts";
 import { checkFreshness, type SidecarEntry } from "../sidecars/freshness.ts";
 import {
   type OpenedSidecar,
   type Sidecar,
   SidecarError,
 } from "../sidecars/sidecar.ts";
+import { verifyChunks } from "../sidecars/verify-chunks.ts";
 import { type ChunkRecord, toChunkRecord } from "./chunk-record.ts";
 import { createChunkSchema } from "./chunk-schema.ts";
 import type {
@@ -107,14 +108,9 @@ function indexDocument(
   const summary: DocumentSummary = { ref: path, path, ...metadata };
   const chunks: IndexedChunk[] = [];
   const records: ChunkRecord[] = [];
+  verifyChunks(doc, sidecar);
   sidecar.chunks.forEach((chunk, ordinal) => {
     const text = chunkText(body, chunk);
-    // The document hash matched, so a differing chunk means offsets from another normalisation or a damaged file.
-    if (hashChunk(chunk.breadcrumb, text) !== chunk.hash) {
-      throw new SidecarError(
-        `chunk ${ordinal} does not match the document text`,
-      );
-    }
     const indexed: IndexedChunk = {
       ordinal,
       breadcrumb: chunk.breadcrumb,

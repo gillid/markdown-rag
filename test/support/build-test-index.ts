@@ -9,7 +9,7 @@ import { readSidecarEntries } from "../../src/sidecars/read-entries.ts";
 import { createCountingEmbedder } from "./embed-fakes.ts";
 
 // A fake embedder must carry a preset's ID and dims for the freshness check to accept it.
-export const MODEL = { modelId: "bge-small-en-v1.5", dims: 384 };
+export const MODEL = { modelId: "bge-small-en-v1.5-q8", dims: 384 };
 
 /** Embeds `sourceDir` with a fake embedder into `targetDir` and builds the index from the sidecars. */
 export async function buildTestIndex(

@@ -188,7 +188,7 @@ describe("embedKnowledgeBase", () => {
     );
   });
 
-  it("does not invalidate a fresh sidecar when only the chunker changes", async () => {
+  it("re-chunks a sidecar built by another chunker, reusing the vectors of unchanged chunks", async () => {
     await writeDoc(sourceDir, "a.md", ["alpha"]);
     await embed(createCountingEmbedder());
     const chunker = { ...createParagraphChunker(), id: "paragraphs@2" };
@@ -196,10 +196,49 @@ describe("embedKnowledgeBase", () => {
 
     const report = await embed(embedder, chunker);
 
-    expect(report).toMatchObject({ written: 0, upToDate: 1 });
+    expect(report).toMatchObject({
+      written: 1,
+      upToDate: 0,
+      chunksEmbedded: 0,
+      chunksReused: 1,
+    });
     expect((await readSidecar(targetDir, "a.md"))?.chunker).toBe(
-      "paragraphs@1",
+      "paragraphs@2",
     );
+  });
+
+  it("fails a document whose chunker leaves text in no chunk, writing no sidecar", async () => {
+    await writeDoc(sourceDir, "a.md", ["alpha", "beta"]);
+    const paragraphs = createParagraphChunker();
+    const chunker = {
+      ...paragraphs,
+      id: "partial@1",
+      async chunk(doc: Parameters<typeof paragraphs.chunk>[0]) {
+        return (await paragraphs.chunk(doc)).slice(0, 1);
+      },
+    };
+
+    const report = await embed(createCountingEmbedder(), chunker);
+
+    expect(report).toMatchObject({ written: 0, upToDate: 0 });
+    expect(report.failures).toHaveLength(1);
+    expect(report.failures[0]?.reason).toMatch(
+      /^chunker partial@1: the document text between offsets \d+ and \d+ is in no chunk$/,
+    );
+    expect(await readSidecar(targetDir, "a.md")).toBeUndefined();
+  });
+
+  it("rebuilds a header-fresh sidecar whose chunks no longer match the document", async () => {
+    await writeDoc(sourceDir, "a.md", ["alpha"]);
+    await embed(createCountingEmbedder());
+    const path = join(targetDir, "vectors", "a.md.vec.json");
+    const damaged = JSON.parse(await readFile(path, "utf8"));
+    damaged.chunks[0].hash = "0".repeat(64);
+    await writeFile(path, JSON.stringify(damaged));
+
+    const report = await embed(createCountingEmbedder());
+
+    expect(report).toMatchObject({ written: 1, upToDate: 0, failures: [] });
   });
 
   it("re-chunks up-to-date documents with rechunk, reusing the vectors", async () => {
