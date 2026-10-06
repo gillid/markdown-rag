@@ -54,6 +54,9 @@ describe("loadKnowledgeBase against static fixtures", () => {
   });
 });
 
+// Built from the code unit so no editor or formatter can strip it from the source.
+const BOM = String.fromCharCode(0xfeff);
+
 describe("loadKnowledgeBase walking", () => {
   let root: string;
 
@@ -82,6 +85,17 @@ describe("loadKnowledgeBase walking", () => {
       `# ${title}`,
       "",
     ].join("\n");
+
+  it("loads a document saved with a byte order mark, hashing it like one without", async () => {
+    await write("plain.md", doc("A"));
+    await write("bom.md", `${BOM}${doc("A")}`);
+    const { documents, errors } = await loadKnowledgeBase(
+      loadConfig({ sourceDir: root }),
+    );
+    expect(errors).toEqual([]);
+    expect(documents.map((d) => d.docHash)).toHaveLength(2);
+    expect(documents[0]?.docHash).toBe(documents[1]?.docHash);
+  });
 
   it("finds Markdown files in nested directories and reports POSIX paths", async () => {
     await write("a.md", doc("A"));
