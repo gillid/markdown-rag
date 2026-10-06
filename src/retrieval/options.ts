@@ -1,19 +1,25 @@
-import type { SearchMode } from "../index/search-candidates.ts";
+import type { IndexedDocument } from "../index/knowledge-index.ts";
+import { SEARCH_MODES, type SearchMode } from "../index/search-mode.ts";
 import {
   requirePositive,
   validateHybridWeights,
 } from "../index/validate-query.ts";
-import { type SignalWeights, validateWeights } from "./signals.ts";
+import { RetrievalOptionError } from "./errors.ts";
+import {
+  declaredSignals,
+  type SignalWeights,
+  validateWeights,
+} from "./signals.ts";
 import {
   DEFAULT_RETRIEVAL,
   MAX_EXPAND,
   MAX_LIMIT,
+  MIN_EXPAND,
+  MIN_LIMIT,
   type RetrievalDefaults,
 } from "./types.ts";
 
-const SEARCH_MODES: readonly SearchMode[] = ["hybrid", "keyword", "semantic"];
-
-/** An explicit `undefined` keeps the built-in default instead of overwriting it. */
+/** An explicit `undefined` keeps the built-in default instead of overwriting it; `weights` merge key by key, as a request's do. */
 export function withDefaults(
   overrides: Partial<RetrievalDefaults> = {},
 ): RetrievalDefaults {
@@ -24,7 +30,7 @@ export function withDefaults(
   // Copies, so no retriever shares or can mutate the module's defaults.
   return {
     ...merged,
-    weights: { ...merged.weights },
+    weights: mergeWeights(DEFAULT_RETRIEVAL.weights, overrides.weights),
     hybridWeights: { ...merged.hybridWeights },
   };
 }
@@ -42,7 +48,7 @@ export function mergeWeights(
 
 function requireInteger(name: string, value: number, min: number, max: number) {
   if (!Number.isInteger(value) || value < min || value > max) {
-    throw new RangeError(
+    throw new RetrievalOptionError(
       `${name} must be an integer from ${min} to ${max}, got ${value}`,
     );
   }
@@ -56,18 +62,30 @@ export function validateOptions(options: {
   minScore: number;
 }): void {
   if (!SEARCH_MODES.includes(options.mode)) {
-    throw new RangeError(
+    throw new RetrievalOptionError(
       `mode must be one of ${SEARCH_MODES.join(", ")}, got ${options.mode}`,
     );
   }
-  requireInteger("limit", options.limit, 1, MAX_LIMIT);
-  requireInteger("expand", options.expand, 0, MAX_EXPAND);
+  requireInteger("limit", options.limit, MIN_LIMIT, MAX_LIMIT);
+  requireInteger("expand", options.expand, MIN_EXPAND, MAX_EXPAND);
   if (!Number.isFinite(options.minScore)) {
-    throw new RangeError(`minScore must be finite, got ${options.minScore}`);
+    throw new RetrievalOptionError(
+      `minScore must be finite, got ${options.minScore}`,
+    );
   }
 }
 
-export function validateDefaults(
+/** The configured defaults over the built-in ones, checked against the signals the documents declare. Needs no models. */
+export function resolveDefaults(
+  overrides: Partial<RetrievalDefaults> | undefined,
+  documents: Iterable<IndexedDocument>,
+): RetrievalDefaults {
+  const defaults = withDefaults(overrides);
+  validateDefaults(defaults, declaredSignals(documents));
+  return defaults;
+}
+
+function validateDefaults(
   defaults: RetrievalDefaults,
   declaredSignals: ReadonlySet<string>,
 ): void {

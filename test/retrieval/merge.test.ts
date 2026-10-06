@@ -15,6 +15,8 @@ function document(path: string, chunkCount: number): IndexedDocument {
       meta: {},
     },
     outline: [],
+    body: "",
+    sections: new Map(),
     chunks: Array.from({ length: chunkCount }, (_, ordinal) => ({
       ordinal,
       breadcrumb: path,

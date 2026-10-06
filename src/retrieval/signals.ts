@@ -1,4 +1,5 @@
 import type { IndexedDocument } from "../index/knowledge-index.ts";
+import { RetrievalOptionError } from "./errors.ts";
 
 export const RECENCY = "recency";
 export const MAX_TOTAL_WEIGHT = 0.5;
@@ -37,19 +38,19 @@ export function validateWeights(
   let total = 0;
   for (const [name, weight] of Object.entries(weights)) {
     if (name !== RECENCY && !declared.has(name)) {
-      throw new RangeError(
+      throw new RetrievalOptionError(
         `weight for "${name}": no document declares that signal`,
       );
     }
     if (!Number.isFinite(weight) || weight < 0 || weight > 1) {
-      throw new RangeError(
+      throw new RetrievalOptionError(
         `weight for "${name}" must be in [0, 1], got ${weight}`,
       );
     }
     total += weight;
   }
   if (total > MAX_TOTAL_WEIGHT + WEIGHT_TOLERANCE) {
-    throw new RangeError(
+    throw new RetrievalOptionError(
       `signal weights must sum to at most ${MAX_TOTAL_WEIGHT}, got ${total}`,
     );
   }

@@ -5,6 +5,7 @@ import {
   type ConfigInput,
   loadConfig,
 } from "../../src/config/config.ts";
+import { DEFAULT_RETRIEVAL } from "../../src/retrieval/types.ts";
 
 const cwd = process.cwd();
 
@@ -15,6 +16,7 @@ describe("loadConfig", () => {
       targetDir: join(cwd, "examples", "docs", ".md-rag"),
       modelsDir: join(cwd, "examples", "docs", ".md-rag", "models"),
       allowRemoteModels: true,
+      retrieval: {},
     });
   });
 
@@ -26,6 +28,7 @@ describe("loadConfig", () => {
       targetDir: join(cwd, ".md-rag", "handbook"),
       modelsDir: join(cwd, ".md-rag", "handbook", "models"),
       allowRemoteModels: true,
+      retrieval: {},
     });
   });
 
@@ -100,7 +103,28 @@ describe("loadConfig", () => {
       targetDir,
       modelsDir: join(targetDir, "models"),
       allowRemoteModels: true,
+      retrieval: {},
     });
+  });
+
+  it("passes retrieval defaults through", () => {
+    const retrieval = { limit: 5, rerank: false, weights: { recency: 0.1 } };
+    expect(loadConfig({ sourceDir: "docs", retrieval }).retrieval).toEqual(
+      retrieval,
+    );
+  });
+
+  it("accepts every retrieval default the engine has", () => {
+    expect(
+      loadConfig({ sourceDir: "docs", retrieval: DEFAULT_RETRIEVAL }).retrieval,
+    ).toEqual(DEFAULT_RETRIEVAL);
+  });
+
+  it("rejects an unknown or mistyped retrieval default", () => {
+    const withRetrieval = (retrieval: unknown) =>
+      ({ sourceDir: "docs", retrieval }) as ConfigInput;
+    expect(() => loadConfig(withRetrieval({ limt: 5 }))).toThrow(/limt/);
+    expect(() => loadConfig(withRetrieval({ mode: "fuzzy" }))).toThrow(/mode/);
   });
 
   it("accepts a sibling targetDir whose name starts with sourceDir's", () => {

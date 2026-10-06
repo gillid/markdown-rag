@@ -1,11 +1,27 @@
 import { join, resolve } from "node:path";
 import { z } from "zod";
+import { SEARCH_MODES } from "../index/search-mode.ts";
 import {
   ENGINE_DIR_NAME,
   MODELS_DIR_NAME,
   VECTORS_DIR_NAME,
 } from "./layout.ts";
 import { isSameOrAncestor, isStrictlyInside } from "./paths.ts";
+
+// Only the shape is checked here; ranges and signal names are checked against the index when the engine starts (ADR-013, ADR-034).
+const retrievalSchema = z
+  .strictObject({
+    mode: z.enum(SEARCH_MODES),
+    candidates: z.number(),
+    limit: z.number(),
+    minScore: z.number(),
+    expand: z.number(),
+    weights: z.record(z.string(), z.number()),
+    halfLifeDays: z.number(),
+    hybridWeights: z.strictObject({ text: z.number(), vector: z.number() }),
+    rerank: z.boolean(),
+  })
+  .partial();
 
 // Every optional field gets a default here, so Config is always complete.
 const configSchema = z
@@ -14,6 +30,7 @@ const configSchema = z
     targetDir: z.string().min(1, "must not be empty").optional(),
     modelsDir: z.string().min(1, "must not be empty").optional(),
     allowRemoteModels: z.boolean().default(true),
+    retrieval: retrievalSchema.default({}),
   })
   .transform((input, ctx) => {
     const sourceDir = resolve(input.sourceDir);
@@ -72,6 +89,7 @@ const configSchema = z
       targetDir,
       modelsDir,
       allowRemoteModels: input.allowRemoteModels,
+      retrieval: input.retrieval,
     };
   });
 

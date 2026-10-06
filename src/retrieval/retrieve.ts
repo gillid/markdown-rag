@@ -4,17 +4,13 @@ import type {
 } from "../index/knowledge-index.ts";
 import {
   type CandidateQuery,
-  type SearchMode,
   searchCandidates,
 } from "../index/search-candidates.ts";
+import type { SearchMode } from "../index/search-mode.ts";
 import { capPerDocument } from "./candidates.ts";
+import { RetrievalOptionError } from "./errors.ts";
 import { joinChunks, mergeAndExpand, type ScoredHit } from "./merge.ts";
-import {
-  mergeWeights,
-  validateDefaults,
-  validateOptions,
-  withDefaults,
-} from "./options.ts";
+import { mergeWeights, resolveDefaults, validateOptions } from "./options.ts";
 import {
   blend,
   declaredSignals,
@@ -41,14 +37,13 @@ function passageOf(chunk: IndexedChunk): string {
 
 /** Binds an index and its models; `retrieve` runs the whole read path for one request (ADR-012, ADR-013, ADR-027, ADR-034). */
 export function createRetriever(deps: RetrieverDeps) {
-  const defaults = withDefaults(deps.defaults);
   const { index, embedder, reranker } = deps;
+  const defaults = resolveDefaults(deps.defaults, index.documents.values());
   const now = deps.now ?? Date.now;
   const declared = declaredSignals(index.documents.values());
   if (defaults.rerank && reranker === undefined) {
     throw new TypeError("a reranker is required while rerank is on");
   }
-  validateDefaults(defaults, declared);
   // Same-size vectors from another model would be accepted and rank nonsense (ADR-032).
   if (index.model !== undefined && index.model.modelId !== embedder.modelId) {
     throw new Error(
@@ -80,7 +75,7 @@ export function createRetriever(deps: RetrieverDeps) {
     const minScore = request.minScore ?? defaults.minScore;
     const weights = mergeWeights(defaults.weights, request.weights);
     if (hasNoVisibleText(request.query)) {
-      throw new RangeError("the query must not be blank");
+      throw new RetrievalOptionError("the query must not be blank");
     }
     validateOptions({ mode, limit, expand, minScore });
     validateWeights(weights, declared);

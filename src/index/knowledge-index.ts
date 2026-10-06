@@ -1,4 +1,4 @@
-import type { HeadingRef } from "../chunking/blocks.ts";
+import type { HeadingRef, Range } from "../chunking/blocks.ts";
 import type { DocumentMetadata } from "../contract/document.ts";
 import type { Embedder } from "../models/embedder.ts";
 import type { ChunkIndex } from "./chunk-schema.ts";
@@ -20,6 +20,9 @@ export interface IndexedChunk {
 export interface IndexedDocument {
   summary: DocumentSummary;
   outline: HeadingRef[];
+  body: string;
+  /** Offsets into `body` by heading anchor, for reading one section. */
+  sections: ReadonlyMap<string, Range>;
   /** In document order. */
   chunks: IndexedChunk[];
 }
