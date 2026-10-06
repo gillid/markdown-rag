@@ -8,8 +8,6 @@ import {
   validateVectorValues,
 } from "./validate-query.ts";
 
-export type SearchMode = "hybrid" | "keyword" | "semantic";
-
 export const DEFAULT_HYBRID_WEIGHTS: HybridWeights = { text: 0.5, vector: 0.5 };
 export const DEFAULT_TITLE_BOOST = 1.1;
 

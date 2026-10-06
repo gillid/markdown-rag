@@ -7,9 +7,9 @@ import type { Filter } from "../../src/index/filter.ts";
 import type { KnowledgeIndex } from "../../src/index/knowledge-index.ts";
 import {
   type CandidateQuery,
-  type SearchMode,
   searchCandidates,
 } from "../../src/index/search-candidates.ts";
+import type { SearchMode } from "../../src/index/search-mode.ts";
 import { buildTestIndex, MODEL } from "../support/build-test-index.ts";
 import { createCountingEmbedder } from "../support/embed-fakes.ts";
 

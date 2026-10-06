@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { KnowledgeIndex } from "../../src/index/knowledge-index.ts";
-import type { SearchMode } from "../../src/index/search-candidates.ts";
+import type { SearchMode } from "../../src/index/search-mode.ts";
 import type { Reranker } from "../../src/models/reranker.ts";
 import { createRetriever } from "../../src/retrieval/retrieve.ts";
 import type { RetrievalDefaults } from "../../src/retrieval/types.ts";

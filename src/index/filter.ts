@@ -1,23 +1,33 @@
 import type { WhereCondition } from "@orama/orama";
+import { z } from "zod";
 import { ancestorDirs } from "./chunk-record.ts";
 import type { ChunkSchema } from "./chunk-schema.ts";
 import type { DocumentSummary } from "./knowledge-index.ts";
 
 type Where = WhereCondition<ChunkSchema>;
 
-/** The filter every operation shares (ADR-035). An absent or empty field puts no constraint on the results. */
-export interface Filter {
-  /** Any of these sources. */
-  sources?: string[];
-  /** All of these tags. */
-  tags?: string[];
-  /** Any of these tags. */
-  tags_any?: string[];
-  /** A directory relative to the knowledge base root, with or without a leading `./` or `/`, a trailing slash or empty and `.` segments; matches documents anywhere beneath it. */
-  dir?: string;
-  /** Epoch milliseconds; matches documents updated strictly later. */
-  updated_after?: number;
-}
+const nameList = z.array(z.string().min(1, "must not be empty"));
+
+const relativeDir = z
+  .string()
+  .refine((dir) => !dir.includes("\\"), {
+    message: "must use / as the separator, not backslashes",
+  })
+  .refine((dir) => !dir.split("/").includes(".."), {
+    message: 'must not contain ".." segments',
+  });
+
+/** The filter every operation shares (ADR-035); strict, so a misspelt field is an error rather than "no constraint". */
+export const filterSchema = z.strictObject({
+  sources: nameList.optional(),
+  tags: nameList.optional(),
+  tags_any: nameList.optional(),
+  // Matches documents anywhere beneath it; `./a`, `/a` and `a/` all name `a` (see `normaliseDir`).
+  dir: relativeDir.optional(),
+  updated_after: z.number().optional(),
+});
+
+export type Filter = z.infer<typeof filterSchema>;
 
 function isPresent(list: string[] | undefined): list is string[] {
   return list !== undefined && list.length > 0;

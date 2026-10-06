@@ -4,15 +4,15 @@ import type {
   DocumentSummary,
   KnowledgeIndex,
 } from "../index/knowledge-index.ts";
-import {
-  DEFAULT_HYBRID_WEIGHTS,
-  type SearchMode,
-} from "../index/search-candidates.ts";
+import { DEFAULT_HYBRID_WEIGHTS } from "../index/search-candidates.ts";
+import type { SearchMode } from "../index/search-mode.ts";
 import type { Embedder } from "../models/embedder.ts";
 import type { Reranker } from "../models/reranker.ts";
 import { RECENCY, type SignalWeights } from "./signals.ts";
 
+export const MIN_LIMIT = 1;
 export const MAX_LIMIT = 10;
+export const MIN_EXPAND = 0;
 export const MAX_EXPAND = 2;
 export const MAX_CHUNKS_PER_DOCUMENT = 2;
 
