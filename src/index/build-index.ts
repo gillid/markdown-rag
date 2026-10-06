@@ -17,13 +17,14 @@ import {
 import { verifyChunks } from "../sidecars/verify-chunks.ts";
 import { type ChunkRecord, toChunkRecord } from "./chunk-record.ts";
 import { createChunkSchema } from "./chunk-schema.ts";
+import { deepFreeze } from "./deep-freeze.ts";
 import type {
   DocumentSummary,
   IndexedChunk,
   IndexedDocument,
   KnowledgeIndex,
 } from "./knowledge-index.ts";
-import { buildOutline } from "./outline.ts";
+import { buildHeadings } from "./outline.ts";
 import { computeIndexVersion, type VersionedDocument } from "./version.ts";
 
 // English is fixed for the PoC, as are the models (ADR-010).
@@ -105,7 +106,12 @@ function indexDocument(
   sidecar: Sidecar,
 ): { document: IndexedDocument; records: ChunkRecord[] } {
   const { path, docHash, tree, body, ...metadata } = doc;
-  const summary: DocumentSummary = { ref: path, path, ...metadata };
+  // Frozen, because responses hand these objects out and a caller's edit must not change what later calls see; cloned, so the loaded document isn't frozen too.
+  const summary: DocumentSummary = deepFreeze({
+    ref: path,
+    path,
+    ...structuredClone(metadata),
+  });
   const chunks: IndexedChunk[] = [];
   const records: ChunkRecord[] = [];
   verifyChunks(doc, sidecar);
@@ -120,8 +126,9 @@ function indexDocument(
     chunks.push(indexed);
     records.push(toChunkRecord(summary, indexed, chunk.vector));
   });
+  const { outline, sections } = buildHeadings(tree, body.length);
   return {
-    document: { summary, outline: buildOutline(tree), chunks },
+    document: { summary, outline: deepFreeze(outline), body, sections, chunks },
     records,
   };
 }
