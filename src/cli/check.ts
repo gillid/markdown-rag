@@ -1,4 +1,3 @@
-import { parseArgs } from "node:util";
 import { formatPathErrors } from "../contract/format-errors.ts";
 import {
   type DocumentLoadError,
@@ -11,6 +10,7 @@ import { readSidecarEntries } from "../sidecars/read-entries.ts";
 import { SidecarError } from "../sidecars/sidecar.ts";
 import { verifySidecars } from "../sidecars/verify-chunks.ts";
 import { loadConfigOutcome } from "./load-config.ts";
+import { parseFlags } from "./parse-flags.ts";
 import { type CliResult, usageError } from "./result.ts";
 
 export const CHECK_HELP = `Usage: md-rag check --source-dir <dir> [options]
@@ -30,15 +30,15 @@ Options:
 export async function runCheck(argv: readonly string[]): Promise<CliResult> {
   let values: { "source-dir"?: string; "target-dir"?: string; help?: boolean };
   try {
-    ({ values } = parseArgs({
-      args: argv,
-      options: {
+    ({ values } = parseFlags(
+      argv,
+      {
         "source-dir": { type: "string" },
         "target-dir": { type: "string" },
         help: { type: "boolean", short: "h" },
       },
-      allowPositionals: false,
-    }));
+      false,
+    ));
   } catch (cause) {
     return usageError(errorMessage(cause), CHECK_HELP);
   }

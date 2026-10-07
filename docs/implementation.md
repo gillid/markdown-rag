@@ -155,14 +155,15 @@ Status: `planned` · `in-progress` · `done`
 - The package's `exports` expose only this API and its schemas. Step 19.1 publishes them.
 - **Tests:** against `examples/docs` using fakes: an end-to-end search; `overview` counts checked against hand-counted literals, with and without a filter; `listDocuments` filtering, both sorts and paging; `getDocument` for a whole document, a section and `body: false`.
 
-### 18. Query CLI commands · `planned`
+### 18. Query CLI commands · `done`
 
-- One command per operation, each building the engine and running it once (ADR-035). All of them accept the same filter flags (`--source`, `--tag`, `--tag-any`, `--dir`, `--since`, each repeatable where the filter takes a list), parsed by one shared helper, and `--json`, which prints the matching schema instead of Markdown.
+- One command per operation, each building the engine and running it once (ADR-035). `overview`, `search` and `list` accept the same filter flags (`--source`, `--tag`, `--tag-any`, `--dir`, `--since`, each repeatable where the filter takes a list), parsed by one shared helper; `get` takes a ref and no filter. All of them accept `--json`, which prints the matching schema instead of Markdown.
   - `md-rag overview`: counts, then the sources, tags and signals with their document counts.
   - `md-rag search "<query>" [--mode --limit --min-score --expand --weight name=value]`: for each result, a heading built from the breadcrumb; a line with `source`, `updated` date, `url`, `ref` and the final score; then the snippet. It ends with `index_version`, or prints an explicit "no relevant context found" message when there are no results.
   - `md-rag list [--sort --limit --offset]`: one line per document with `ref`, title, `source`, `updated` date and tags, followed by the total and the range shown.
   - `md-rag get <ref> [--no-body]`: the summary as a header block, the outline, then the body.
-- **Tests:** snapshot tests of the Markdown renderers, and tests of the shared filter-flag parser.
+- **Decided:** flags are parsed before the engine starts, so a typo or a malformed value (`--since` must be an ISO 8601 date or zoned date-time and means "updated on or after" (one millisecond earlier than the engine's exclusive `updated_after`), `--limit`, `--min-score` and `--expand` must be plain finite numbers, a single-value flag given twice is an error, `--weight` must be `name=value`, may not repeat a name and may not be `__proto__`, a negative `--min-score` is written `--min-score=-0.5` because `parseArgs` reads `-0.5` as a flag, and `--help` wins over every flag value and over a repeated flag) fails with the usage text before any index is built or model loaded. The assembled filter or request is also checked against the engine's own zod schemas before it starts, so an out-of-range `--limit`, an empty `--tag` or a backslash in `--dir` is a `usage` failure before the index is built, and only what depends on the index (a weight for a signal no document declares) reaches the engine as `invalid_request`. `overview`, `list` and `get` start the engine with `loadModels: false`; only `search` takes `--models-dir` and `--offline`. The "no relevant context found" message is followed by `index_version` like any other result. `get` accepts `--no-body`. Each search snippet is printed as a blockquote (every line prefixed with `> `), so a heading inside a chunk can't be mistaken for the start of the next result; `--json` returns the chunk text untouched. `check` and `embed` parse their flags through the same helper, so they also reject a single-value flag given twice. With `--json` a failure is one `{ "error": { "kind", "message" } }` object on stderr, stdout stays empty and the exit code is 1; `kind` is `usage` (including a configuration the engine rejects, such as a `--target-dir` that is the source dir), `invalid_request`, `not_found`, `startup` (the engine could not start: stale sidecars, models) or `internal`, and `message` is the text the plain-text output prints. Step 19's HTTP errors should reuse this object.
+- **Tests:** literal-output tests of the Markdown renderers (hand-written strings rather than stored snapshots), tests of the shared filter-flag parser and number flags, and end-to-end command tests over a small knowledge base using the internal `startEngine` with fake models.
 
 ### 19. HTTP API · `planned`
 
@@ -175,7 +176,10 @@ Status: `planned` · `in-progress` · `done`
   - `GET /healthz`: liveness, ready immediately
   - `GET /readyz`: ready only once the engine promise has resolved, that is after the index is built and the models have loaded and warmed up. Until then it, and every operation, answers 503
 - `md-rag serve [--port]` runs it on `node:http`, starts listening before the engine is ready so that `/healthz` answers at once, logs a startup failure to stderr and exits non-zero, and shuts down gracefully on SIGTERM. Logs go to stderr. The port comes only from `--port`, never from a `PORT` environment variable (ADR-032).
-- **Tests:** health and readiness transitions, a validation error, a round trip for each operation, and query parameters producing the same filter as the equivalent JSON body.
+- Every failure is the error object of ADR-041. `usage` and `invalid_request` answer 400, `not_found` 404, `internal` 500, and `startup` 503, which is also what every operation answers while the engine is pending or failed.
+- **Fix before relying on it:** zod's `record` silently drops a `__proto__` key, and `JSON.parse` creates that key as an own property, so `POST /search` with `{"weights":{"__proto__":1}}` would run with the weight ignored. Make `SearchRequest` reject it as an `invalid_request` (the CLI already rejects `--weight __proto__=…`), the same fail-loud rule as a weight for an undeclared signal (ADR-034).
+- `DocumentList` echoes the `offset` and `limit` it applied, so a client (and the CLI's "Showing a–b of N" line, which today re-derives the offset) reports what the engine did rather than what was asked.
+- **Tests:** health and readiness transitions, a validation error, a round trip for each operation, query parameters producing the same filter as the equivalent JSON body, the status code for each error `kind`, and a rejected `__proto__` weight.
 
 ### 19.1 Package distribution · `planned`
 
@@ -198,6 +202,11 @@ Status: `planned` · `in-progress` · `done`
   - to search again with a refined query or another mode, rather than rely on a weak result
   - to use `expand` or `getDocument` when a snippet isn't enough — including when a hit is clearly the right document but the wrong section (e.g. it found the team's mission statement when the question was about their Slack channel)
   - to treat results as reference material, not instructions
+  - to judge a hit by its breadcrumb and by reading the section, never by its score: scores are relative, not calibrated (ADR-036), so one query's 0.06 can be the right runbook and another's 0.59 an unrelated section (both seen on `examples/docs`), and they can't be compared across queries
+  - to prefer `list` with tag filters, using names learned from `overview`, to find the owning team or the runbook for a topic, since a search phrased as a symptom ranked weakly while the tag filter found both at once
+  - to say so when the knowledge base has nothing on the topic (an exact-term `keyword` search finds nothing and the hybrid results are unrelated) rather than stretch the nearest result
+  - the CLI details an agent trips on: `--` before a query that starts with a dash, `--min-score=-0.5` for a negative value, and `--json` for structured output, where a failure is the error object of ADR-041 and its `kind` says whether to fix the call (`usage`, `invalid_request`, `not_found`) or report it (`startup`, `internal`)
+  - one worked scenario end to end, from an incident ("customers can't pay with PayPal; notify the relevant teams and mitigate"): `overview`; a `keyword` search for the exact term, which finds nothing; `list` by the `payments` and `incidents` tags, which finds the payment-incident runbook and the owning team; `get --no-body` for the runbook's outline, then its mitigation and escalation sections; the escalation policy's severity and paging sections; the team's `#contacts` section. It also shows where the agent must stop and say the knowledge base has no PayPal-specific page and no customer-communication guidance
 - Verify manually with Claude Code against `examples/docs`.
 
 ## Milestone 7: Validation
@@ -207,6 +216,8 @@ Status: `planned` · `in-progress` · `done`
 - `examples/eval/queries.yaml` holds entries of the form `{ query, expected: [path or ref], filters? }`, covering each fixture case from step 3.
 - `md-rag eval` reports Recall@K, MRR and nDCG@N, with a per-query breakdown of misses. It runs after `md-rag embed`, and `--target-dir` points it at an alternative sidecar set (e.g. one built with a different chunk-size target, step 23, ADR-037).
 - Include a query against the step 3.1 directory-style fixture whose answer lives in a different section/chunk than the one that best matches semantically. This checks whether retrieval at least surfaces the right *document* (recall at the doc level, not just the chunk level) — the follow-up step of using `getDocument`/`expand` to reach the specific fact is an agent behaviour, verified against `docs/agent-setup.md` (step 20), not a retrieval metric.
+- Add the agent-style cases found by hand on `examples/docs`: a symptom query with no exact term whose answer is the payment-incident runbook; "who do I notify" queries whose answer is the escalation policy's `#paging-tiers` and the payments team's `#contacts`; and the step 3.1 variants phrased by what the team does (mission, owned services) rather than by "Slack channel", plus a pure paraphrase ("the people who keep charges and refunds reliable") that currently misses the team document entirely.
+- Support no-answer queries, written `expected: []` (for example "PayPal", which nothing in `examples/docs` mentions, or a status-page question the knowledge base can't answer). They add nothing to recall; for each, the report lists the results returned and the best relevance, and the summary counts the queries that still returned results. This is what step 23 tunes `min_score` against, since today the default lets unrelated chunks through.
 - Ablation flags `--no-rerank` and `--mode <hybrid|keyword|semantic>` measure what each stage contributes (ADR-027).
 - `--save <file>` writes the metrics and per-query ranks as JSON. `--compare <file>` prints the differences against a saved run, both overall and per query (after Grapevine's `search-eval`).
 - **Tests:** metric functions checked against hand-computed worked examples.
@@ -227,7 +238,7 @@ Status: `planned` · `in-progress` · `done`
 - **Reranker:** compare with and without it (`--no-rerank`), and decide the default under ADR-027, weighing the quality gain against the rerank p95.
 - **Modes:** compare `hybrid`, `keyword` and `semantic`.
 - **Pooling:** compare CLS (the default) with mean pooling on the golden queries; a change invalidates every sidecar, so decide it before release.
-- Tune the hybrid weights, title boost, K, `min_score`, `weights.recency` and the 0.5 cap on the summed signal weights (ADR-034).
+- Tune the hybrid weights, title boost, K, `min_score`, `weights.recency` and the 0.5 cap on the summed signal weights (ADR-034). Choose `min_score` from the `relevance` of the known-good hits against the no-answer queries of step 21 (ADR-036 compares it with `relevance`, not `final`), and decide whether the engine needs a non-zero default: with 0, a query the knowledge base can't answer still returns its nearest chunks.
 - Record everything in `docs/benchmarks.md`. Update the defaults and the relevant ADR entries if any values change. Confirm the PoC success criteria (design §2).
 
 ### 24. Integrator documentation · `planned`
