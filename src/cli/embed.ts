@@ -1,4 +1,3 @@
-import { parseArgs } from "node:util";
 import { createStructuralChunker } from "../chunking/structural-chunker.ts";
 import type { Config } from "../config/config.ts";
 import { formatPathErrors } from "../contract/format-errors.ts";
@@ -11,6 +10,7 @@ import type { Embedder } from "../models/embedder.ts";
 import { createTransformersEmbedder } from "../models/transformers-embedder.ts";
 import { type EmbedReport, embedKnowledgeBase } from "../sidecars/embed.ts";
 import { loadConfigOutcome } from "./load-config.ts";
+import { parseFlags } from "./parse-flags.ts";
 import { type CliResult, usageError } from "./result.ts";
 
 export const EMBED_HELP = `Usage: md-rag embed --source-dir <dir> [options]
@@ -47,9 +47,9 @@ export async function runEmbed(
     help?: boolean;
   };
   try {
-    ({ values } = parseArgs({
-      args: argv,
-      options: {
+    ({ values } = parseFlags(
+      argv,
+      {
         "source-dir": { type: "string" },
         "target-dir": { type: "string" },
         "models-dir": { type: "string" },
@@ -57,8 +57,8 @@ export async function runEmbed(
         rechunk: { type: "boolean" },
         help: { type: "boolean", short: "h" },
       },
-      allowPositionals: false,
-    }));
+      false,
+    ));
   } catch (cause) {
     return usageError(errorMessage(cause), EMBED_HELP);
   }
