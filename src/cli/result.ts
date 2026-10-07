@@ -8,6 +8,10 @@ ${help}`,
   };
 }
 
+export function toJson(output: unknown): string {
+  return `${JSON.stringify(output, null, 2)}\n`;
+}
+
 export interface CliResult {
   readonly exitCode: number;
   readonly stdout: string;

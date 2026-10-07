@@ -1,13 +1,21 @@
 import { pathToFileURL } from "node:url";
 import { runCheck } from "./check.ts";
 import { runEmbed } from "./embed.ts";
+import { runGet } from "./get.ts";
+import { runList } from "./list.ts";
+import { runOverview } from "./overview.ts";
 import type { CliResult } from "./result.ts";
+import { runSearch } from "./search.ts";
 
 export const HELP = `Usage: md-rag <command> [options]
 
 Commands:
-  check   Validate the knowledge base contract
-  embed   Chunk and embed documents into sidecars
+  check     Validate the knowledge base contract
+  embed     Chunk and embed documents into sidecars
+  overview  Count documents and list the sources, tags and signals
+  search    Ranked, cited search
+  list      List documents, unranked
+  get       Print one document or section
 
 Options:
   -h, --help  Show this help message
@@ -26,6 +34,22 @@ export async function run(argv: readonly string[]): Promise<CliResult> {
 
   if (command === "embed") {
     return runEmbed(rest);
+  }
+
+  if (command === "overview") {
+    return runOverview(rest);
+  }
+
+  if (command === "search") {
+    return runSearch(rest);
+  }
+
+  if (command === "list") {
+    return runList(rest);
+  }
+
+  if (command === "get") {
+    return runGet(rest);
   }
 
   return { exitCode: 1, stdout: "", stderr: `Unknown command\n\n${HELP}` };
