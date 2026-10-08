@@ -42,8 +42,7 @@ function runBin(bin: string, args: string[]) {
 }
 
 function fail(message: string): never {
-  console.error(`pack-smoke: ${message}`);
-  process.exit(1);
+  throw new Error(message);
 }
 
 const work = await mkdtemp(join(tmpdir(), "md-rag-pack-"));
@@ -62,7 +61,7 @@ try {
   );
   run(
     "npm",
-    ["install", join(packDir, tarball), "typescript", "@types/node@24"],
+    ["install", join(packDir, tarball), "typescript@^7.0.2", "@types/node@24"],
     consumerDir,
   );
 
@@ -96,6 +95,11 @@ try {
   );
 
   console.log("pack-smoke: ok");
+} catch (error) {
+  console.error(
+    `pack-smoke: ${error instanceof Error ? error.message : String(error)}`,
+  );
+  process.exitCode = 1;
 } finally {
   await rm(work, { recursive: true, force: true });
 }
