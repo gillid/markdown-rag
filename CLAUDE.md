@@ -4,8 +4,9 @@ An open-source engine that serves a Git repository of Markdown files to AI agent
 
 ## Tech Stack
 
-- **Runtime:** Node.js 24 LTS, ESM. TypeScript runs directly through native type stripping (no build step), with `tsc --noEmit` for type-checking only. Use erasable syntax only: no `enum`, no `namespace`, no parameter properties. Sidecar vectors use Node 24's native `DataView` float16 methods (ADR-033), so the `tsconfig.json` `lib` includes `ESNext.Float16`.
+- **Runtime:** Node.js 24 LTS, ESM. TypeScript runs directly through native type stripping (no build step in development), with `tsc --noEmit` for type-checking only. Use erasable syntax only: no `enum`, no `namespace`, no parameter properties. Sidecar vectors use Node 24's native `DataView` float16 methods (ADR-033), so the `tsconfig.json` `lib` includes `ESNext.Float16`.
 - **Package manager:** pnpm
+- **Distribution:** one npm package, `markdown-rag`, whose binary is `md-rag`. `tsc` emits JS and `.d.ts` into `dist/` only at pack time (`prepack`, ADR-030); `publishConfig` points `bin` and `exports` at `dist/`, while in the repo they point at the `.ts` sources. Pushing a `v<version>` tag publishes through `.github/workflows/publish.yml` (npm trusted publishing, ADR-043).
 - **Search:** `@orama/orama` (in-process hybrid index) with `@orama/stopwords` for the English BM25 stopword list
 - **Query-path models (local):** `@huggingface/transformers` on `onnxruntime-node`. The embedder is `Xenova/bge-small-en-v1.5` and the reranker is `Xenova/ms-marco-MiniLM-L-6-v2` (q8).
 - **Parsing and validation:** `mdast-util-from-markdown`, `mdast-util-frontmatter`, `mdast-util-gfm-table` (tables are parsed as tables), `mdast-util-to-string`, `yaml`, `zod`
@@ -25,6 +26,8 @@ Keep this list in sync with `package.json`.
 | `pnpm typecheck` | `tsc --noEmit` |
 | `pnpm test` | Unit tests; no model downloads and no LLM calls |
 | `pnpm test:models` | Model-backed tests (`*.models.test.ts`); downloads models on first run |
+| `pnpm build` | Emit JS and `.d.ts` into `dist/` (also runs from `prepack`) |
+| `pnpm test:pack` | Pack the tarball, install it in a temp directory and smoke-test the binary and types; needs network for `npm install` |
 
 Before reporting work as done, run `pnpm lint:fix`, `pnpm typecheck` and `pnpm test`.
 
@@ -55,6 +58,8 @@ Before reporting work as done, run `pnpm lint:fix`, `pnpm typecheck` and `pnpm t
 | Benchmark and chunker comparison | `docs/benchmarks.md` (planned, steps 22–23) |
 | Sample knowledge base and golden queries | `examples/docs/`, `examples/eval/` (planned, steps 3, 21) |
 | CLI entry and subcommands | `src/cli/` |
+| Pack-time emit config and the packed-tarball smoke test | `tsconfig.build.json`, `scripts/pack-smoke.ts` |
+| Release workflow (tag push publishes to npm) | `.github/workflows/publish.yml` |
 | Runtime config | `src/config/` |
 | Storage loading and contract validation | `src/contract/` |
 | Sidecar format, freshness, `md-rag embed` | `src/sidecars/` |
