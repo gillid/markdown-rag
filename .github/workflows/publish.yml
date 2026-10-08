@@ -20,16 +20,23 @@ jobs:
       unpublished: ${{ steps.version.outputs.unpublished }}
     steps:
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
       - id: version
         run: |
           name=$(node -p "require('./package.json').name")
           version=$(node -p "require('./package.json').version")
-          if npm view "$name@$version" version > /dev/null 2>&1; then
+          if lookup=$(npm view "$name@$version" version 2>&1); then
             echo "$name@$version is already on npm, nothing to release"
-            echo "unpublished=false" >> "$GITHUB_OUTPUT"
+            unpublished=false
+          elif grep -q E404 <<< "$lookup"; then
+            unpublished=true
           else
-            echo "unpublished=true" >> "$GITHUB_OUTPUT"
+            echo "$lookup"
+            echo "::error::could not tell whether $name@$version is on npm"
+            exit 1
           fi
+          echo "unpublished=$unpublished" >> "$GITHUB_OUTPUT"
           echo "name=$name" >> "$GITHUB_OUTPUT"
           echo "version=$version" >> "$GITHUB_OUTPUT"
 
@@ -38,12 +45,15 @@ jobs:
     if: needs.check.outputs.unpublished == 'true'
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      contents: read
       id-token: write
     env:
       TARBALL: ${{ runner.temp }}/${{ needs.check.outputs.name }}-${{ needs.check.outputs.version }}.tgz
+      VERSION: ${{ needs.check.outputs.version }}
     steps:
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v6
         with:
@@ -59,11 +69,21 @@ jobs:
       - run: pnpm test:pack "$TARBALL"
       - name: Publish (prereleases go to the next tag, never latest)
         run: |
-          case "${{ needs.check.outputs.version }}" in *-*) dist_tag=next ;; *) dist_tag=latest ;; esac
+          case "$VERSION" in *-*) dist_tag=next ;; *) dist_tag=latest ;; esac
           npm publish "$TARBALL" --provenance --access public --tag "$dist_tag"
-      - name: Tag the release
-        run: |
+
+  # Its own job, so that no dependency code ever runs with a token that can push.
+  tag:
+    needs: [check, publish]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      VERSION: ${{ needs.check.outputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+      - run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git tag "v${{ needs.check.outputs.version }}"
-          git push origin "v${{ needs.check.outputs.version }}"
+          git tag "v$VERSION"
+          git push origin "v$VERSION"
