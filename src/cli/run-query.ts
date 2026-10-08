@@ -1,16 +1,15 @@
 import { ConfigError, type ConfigInput } from "../config/config.ts";
 import {
+  type FailureKind,
+  operationFailureKind,
+} from "../engine/failure-kind.ts";
+import {
   createEngine,
   type Engine,
   type EngineOptions,
 } from "../engine/index.ts";
 import { errorMessage, isErrnoException } from "../errors.ts";
-import {
-  type FailureKind,
-  failure,
-  operationFailureKind,
-  wantsJson,
-} from "./failure.ts";
+import { failure, wantsJson } from "./failure.ts";
 import { FlagError } from "./flag-error.ts";
 import type { CliResult } from "./result.ts";
 
@@ -67,7 +66,7 @@ export function commonInvocation(
 }
 
 /** `parseArgs` reports a bad flag with an `ERR_PARSE_ARGS_*` code; any other failure is a bug and must surface. */
-function isFlagFailure(cause: unknown): cause is Error {
+export function isFlagFailure(cause: unknown): cause is Error {
   return (
     cause instanceof FlagError ||
     (isErrnoException(cause) &&

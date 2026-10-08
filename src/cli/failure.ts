@@ -1,12 +1,5 @@
-import { DocumentNotFoundError, InvalidRequestError } from "../engine/index.ts";
+import type { FailureKind } from "../engine/failure-kind.ts";
 import { type CliResult, toJson, usageError } from "./result.ts";
-
-export type FailureKind =
-  | "usage"
-  | "invalid_request"
-  | "not_found"
-  | "startup"
-  | "internal";
 
 interface FailureOptions {
   json: boolean;
@@ -30,12 +23,6 @@ export function failure(
   return kind === "usage"
     ? usageError(text, help)
     : { exitCode: 1, stdout: "", stderr: `${text}\n` };
-}
-
-export function operationFailureKind(cause: unknown): FailureKind {
-  if (cause instanceof InvalidRequestError) return "invalid_request";
-  if (cause instanceof DocumentNotFoundError) return "not_found";
-  return "internal";
 }
 
 /** Reads `--json` straight from the arguments, because a usage failure happens before they are parsed. */
