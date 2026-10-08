@@ -169,6 +169,8 @@ index_version: abc
 describe("renderList", () => {
   const list: DocumentList = {
     total: 12,
+    offset: 10,
+    limit: 50,
     documents: [
       summary,
       { ...summary, ref: "ops/net.md", title: "Network", tags: [] },
@@ -178,7 +180,7 @@ describe("renderList", () => {
 
   it("prints one line per document and the range shown", () => {
     expect(
-      renderList(list, 10),
+      renderList(list),
     ).toBe(`- ops/db.md · Database runbook · runbooks · 2026-01-15 · ops, db
 - ops/net.md · Network · runbooks · 2026-01-15
 
@@ -189,7 +191,7 @@ index_version: abc
   });
 
   it("reports an empty page", () => {
-    expect(renderList({ ...list, total: 3, documents: [] }, 50)).toBe(
+    expect(renderList({ ...list, total: 3, offset: 50, documents: [] })).toBe(
       "Showing none of 3 document(s).\n\nindex_version: abc\n",
     );
   });

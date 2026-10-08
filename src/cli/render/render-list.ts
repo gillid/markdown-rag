@@ -1,7 +1,8 @@
 import type { DocumentList } from "../../engine/index.ts";
 import { formatDate } from "./format.ts";
 
-export function renderList(list: DocumentList, offset: number): string {
+export function renderList(list: DocumentList): string {
+  const { offset } = list;
   const lines = list.documents.map((document) => {
     const tags =
       document.tags.length === 0 ? "" : ` · ${document.tags.join(", ")}`;

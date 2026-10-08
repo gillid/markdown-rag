@@ -34,6 +34,8 @@ export function listDocumentsOf(
     .sort(comparators[sort]);
   return {
     total: matching.length,
+    offset,
+    limit,
     documents: matching
       .slice(offset, offset + limit)
       .map((s) => toSummaryOutput(s)),
