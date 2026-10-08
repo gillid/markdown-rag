@@ -4,16 +4,14 @@ import {
   type Engine,
   type EngineOptions,
 } from "../engine/index.ts";
-import { errorMessage } from "../errors.ts";
 import { createHttpHandler } from "../http/handler.ts";
 import { loopbackNames } from "../http/loopback.ts";
 import { listen } from "../http/server.ts";
-import { failure } from "./failure.ts";
 import { FlagError } from "./flag-error.ts";
 import { parseIntegerFlag } from "./flag-values.ts";
 import { parseFlags } from "./parse-flags.ts";
+import { commandFailure, preflight, SHOW_HELP } from "./preflight.ts";
 import type { CliResult } from "./result.ts";
-import { isFlagFailure, SHOW_HELP } from "./run-query.ts";
 
 export const DEFAULT_PORT = 3000;
 // No auth in the PoC, so the default keeps the server to this machine.
@@ -74,24 +72,10 @@ export async function runServe(
   argv: readonly string[],
   suppliedDeps?: ServeDeps,
 ): Promise<CliResult> {
-  const fail = (kind: "usage" | "startup", cause: unknown) =>
-    failure("serve", kind, errorMessage(cause), {
-      json: false,
-      help: SERVE_HELP,
-    });
-
-  let values: ReturnType<typeof parseServeFlags>;
-  try {
-    values = parseServeFlags(argv);
-  } catch (cause) {
-    if (isFlagFailure(cause)) return fail("usage", cause);
-    throw cause;
-  }
-  if (values === SHOW_HELP)
-    return { exitCode: 0, stdout: SERVE_HELP, stderr: "" };
-  if (values.sourceDir === undefined) {
-    return fail("usage", "--source-dir is required");
-  }
+  const descriptor = { command: "serve", help: SERVE_HELP };
+  const opening = preflight(descriptor, () => parseServeFlags(argv));
+  if (!opening.ok) return opening.result;
+  const { values } = opening;
 
   const input: ConfigInput = {
     sourceDir: values.sourceDir,
@@ -103,7 +87,9 @@ export async function runServe(
   try {
     loadConfig(input);
   } catch (cause) {
-    if (cause instanceof ConfigError) return fail("usage", cause);
+    if (cause instanceof ConfigError) {
+      return commandFailure(descriptor, "usage", cause);
+    }
     throw cause;
   }
 
@@ -128,7 +114,7 @@ export async function runServe(
       deps.log,
     );
   } catch (cause) {
-    return fail("startup", cause);
+    return commandFailure(descriptor, "startup", cause);
   }
   deps.log(`md-rag: listening on ${server.host}:${server.port}`);
   if (ownNames === undefined) {

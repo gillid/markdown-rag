@@ -159,6 +159,21 @@ describe("md-rag check", () => {
     expect(result.exitCode).toBe(1);
     expect(result.stdout).toBe("");
     expect(result.stderr).toContain("Usage: md-rag check");
+    expect(result.stderr).toMatch(/^check: Unknown option '--bogus'/);
+  });
+
+  it("prefixes a repeated flag with the command and prints usage", async () => {
+    const result = await run([
+      "check",
+      "--source-dir",
+      "a",
+      "--source-dir",
+      "b",
+    ]);
+    expect(result.exitCode).toBe(1);
+    expect(result.stderr).toMatch(
+      /^check: --source-dir was given more than once\n\nUsage: md-rag check/,
+    );
   });
 
   it("exits 0 and prints usage with --help", async () => {

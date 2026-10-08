@@ -1,4 +1,5 @@
 import { parseFlags } from "./parse-flags.ts";
+import { SHOW_HELP } from "./preflight.ts";
 import { renderGet } from "./render/render-get.ts";
 import { type CliResult, toJson } from "./result.ts";
 import {
@@ -9,7 +10,6 @@ import {
   onlyPositional,
   type QueryDeps,
   runQuery,
-  SHOW_HELP,
 } from "./run-query.ts";
 
 export const GET_HELP = `Usage: md-rag get <ref> --source-dir <dir> [options]

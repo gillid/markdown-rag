@@ -11,7 +11,8 @@ import { SidecarError } from "../sidecars/sidecar.ts";
 import { verifySidecars } from "../sidecars/verify-chunks.ts";
 import { loadConfigOutcome } from "./load-config.ts";
 import { parseFlags } from "./parse-flags.ts";
-import { type CliResult, usageError } from "./result.ts";
+import { preflight, SHOW_HELP } from "./preflight.ts";
+import type { CliResult } from "./result.ts";
 
 export const CHECK_HELP = `Usage: md-rag check --source-dir <dir> [options]
 
@@ -28,9 +29,8 @@ Options:
 
 /** Reports contract errors and sidecar freshness problems together; it is meant to run after `embed` (ADR-038). */
 export async function runCheck(argv: readonly string[]): Promise<CliResult> {
-  let values: { "source-dir"?: string; "target-dir"?: string; help?: boolean };
-  try {
-    ({ values } = parseFlags(
+  const opening = preflight({ command: "check", help: CHECK_HELP }, () => {
+    const { values } = parseFlags(
       argv,
       {
         "source-dir": { type: "string" },
@@ -38,24 +38,17 @@ export async function runCheck(argv: readonly string[]): Promise<CliResult> {
         help: { type: "boolean", short: "h" },
       },
       false,
-    ));
-  } catch (cause) {
-    return usageError(errorMessage(cause), CHECK_HELP);
-  }
-
-  if (values.help) {
-    return { exitCode: 0, stdout: CHECK_HELP, stderr: "" };
-  }
-
-  const sourceDir = values["source-dir"];
-  if (sourceDir === undefined) {
-    return usageError("check: --source-dir is required", CHECK_HELP);
-  }
-
-  const configOutcome = loadConfigOutcome({
-    sourceDir,
-    targetDir: values["target-dir"],
+    );
+    if (values.help) return SHOW_HELP;
+    return {
+      sourceDir: values["source-dir"],
+      targetDir: values["target-dir"],
+    };
   });
+  if (!opening.ok) return opening.result;
+  const { sourceDir, targetDir } = opening.values;
+
+  const configOutcome = loadConfigOutcome({ sourceDir, targetDir });
   if (!configOutcome.ok) {
     return configOutcome.result;
   }

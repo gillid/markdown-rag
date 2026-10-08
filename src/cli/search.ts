@@ -14,6 +14,7 @@ import {
   parseNamedNumbers,
 } from "./flag-values.ts";
 import { parseFlags } from "./parse-flags.ts";
+import { SHOW_HELP } from "./preflight.ts";
 import { renderSearch } from "./render/render-search.ts";
 import { type CliResult, toJson } from "./result.ts";
 import {
@@ -24,7 +25,6 @@ import {
   onlyPositional,
   type QueryDeps,
   runQuery,
-  SHOW_HELP,
 } from "./run-query.ts";
 
 export const SEARCH_HELP = `Usage: md-rag search "<query>" --source-dir <dir> [options]

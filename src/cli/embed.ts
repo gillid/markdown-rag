@@ -11,7 +11,8 @@ import { createTransformersEmbedder } from "../models/transformers-embedder.ts";
 import { type EmbedReport, embedKnowledgeBase } from "../sidecars/embed.ts";
 import { loadConfigOutcome } from "./load-config.ts";
 import { parseFlags } from "./parse-flags.ts";
-import { type CliResult, usageError } from "./result.ts";
+import { preflight, SHOW_HELP } from "./preflight.ts";
+import type { CliResult } from "./result.ts";
 
 export const EMBED_HELP = `Usage: md-rag embed --source-dir <dir> [options]
 
@@ -38,16 +39,8 @@ export async function runEmbed(
   argv: readonly string[],
   deps: EmbedDeps = defaultDeps,
 ): Promise<CliResult> {
-  let values: {
-    "source-dir"?: string;
-    "target-dir"?: string;
-    "models-dir"?: string;
-    offline?: boolean;
-    rechunk?: boolean;
-    help?: boolean;
-  };
-  try {
-    ({ values } = parseFlags(
+  const opening = preflight({ command: "embed", help: EMBED_HELP }, () => {
+    const { values } = parseFlags(
       argv,
       {
         "source-dir": { type: "string" },
@@ -58,25 +51,24 @@ export async function runEmbed(
         help: { type: "boolean", short: "h" },
       },
       false,
-    ));
-  } catch (cause) {
-    return usageError(errorMessage(cause), EMBED_HELP);
-  }
-
-  if (values.help) {
-    return { exitCode: 0, stdout: EMBED_HELP, stderr: "" };
-  }
-
-  const sourceDir = values["source-dir"];
-  if (sourceDir === undefined) {
-    return usageError("embed: --source-dir is required", EMBED_HELP);
-  }
+    );
+    if (values.help) return SHOW_HELP;
+    return {
+      sourceDir: values["source-dir"],
+      targetDir: values["target-dir"],
+      modelsDir: values["models-dir"],
+      offline: values.offline === true,
+      rechunk: values.rechunk === true,
+    };
+  });
+  if (!opening.ok) return opening.result;
+  const { sourceDir, targetDir, modelsDir, offline, rechunk } = opening.values;
 
   const configOutcome = loadConfigOutcome({
     sourceDir,
-    targetDir: values["target-dir"],
-    modelsDir: values["models-dir"],
-    allowRemoteModels: values.offline ? false : undefined,
+    targetDir,
+    modelsDir,
+    allowRemoteModels: offline ? false : undefined,
   });
   if (!configOutcome.ok) {
     return configOutcome.result;
@@ -90,7 +82,7 @@ export async function runEmbed(
       knowledgeBase,
       embedder: deps.createEmbedder(config),
       chunker: createStructuralChunker(),
-      rechunk: values.rechunk,
+      rechunk,
     });
     return renderResult(report, knowledgeBase.errors);
   } catch (cause) {
