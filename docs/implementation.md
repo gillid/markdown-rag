@@ -184,17 +184,17 @@ Status: `planned` · `in-progress` · `done`
 
 ### 19.1 Shared CLI pre-flight · `done`
 
-- `check`, `embed`, `runQuery` (behind `overview`, `search`, `list` and `get`) and `serve` each repeat the same opening: parse the flags and turn a flag failure into a `usage` result, let `--help` win over every flag value, and require `--source-dir`. Extract it once and move all of them onto it, so a new failure class or a change to the usage text is made in one place. `serve` then no longer needs `isFlagFailure` and `SHOW_HELP` exported from `run-query.ts`.
+- `check`, `embed`, `runQuery` (behind `overview`, `search`, `list` and `get`) and `serve` each repeat the same opening: parse the flags and turn a flag failure into a `usage` result, let `--help` win over every flag value, and require `--source-dir`. Extract it once and move all of them onto it, so a new failure class or a change to the usage text is made in one place. `serve` then no longer needs `isFlagFailure` and `SHOW_HELP` exported from `run-query.ts` (`SHOW_HELP` itself went away in step 19.1.1).
 - Exit codes, `--json` errors (ADR-041) and the text of every message stay the same, with one exception: a flag failure in `check` and `embed` now starts with the command name (`check: Unknown option …`), as it already did for `serve` and the query commands, because all of them report through the one `failure` path.
 - **Tests:** the existing command tests pass unchanged; the shared helper gets a test of its own for help winning over a bad value, a repeated flag and a missing `--source-dir`.
 
-### 19.1.1 One owner for `--help` · `planned`
+### 19.1.1 One owner for `--help` · `done`
 
 - Step 19.1 left `--help` handling in each of the seven commands: every one declares the `help` option and returns `SHOW_HELP` from its own parse closure, so a command that validates a flag value first (as `serve` does with `--port`) can let a bad value win over `--help`. Move it into `preflight`.
-- `preflight` takes the command's options table and `allowPositionals`, adds the `help` option itself and calls `parseFlags`. When help is set it returns the help result before any value is validated. The command's own step becomes `(values, positionals) => Values`, which only runs when help was not requested. `SHOW_HELP` and the `Values | typeof SHOW_HELP` return type go away. `QueryCommand` carries the options table, so `COMMON_OPTIONS` is merged in one place.
+- `preflight` takes the command's options table and `allowPositionals`, adds the `help` option itself and calls `parseFlags`. When help is set it returns the help result before any value is validated. The command's own step becomes `(parsed) => Values`, where `parsed` is `{ values, positionals }` from `parseFlags`, and it only runs when help was not requested. `SHOW_HELP` and the `Values | typeof SHOW_HELP` return type go away. `QueryCommand` carries the options table, so `COMMON_OPTIONS` is merged in one place.
 - Order: change `preflight` and convert `check` and `embed`; convert `serve`, moving the `--port` and `--host` validation into the second step; convert `runQuery` and the four query commands.
 - Behaviour does not change.
-- **Tests:** per command, `--help` wins over a bad flag value and over a repeated flag; the existing command tests pass unchanged. A command's options table that defines its own `help` is rejected.
+- **Tests:** per command, `--help` wins over a bad flag value and over a repeated flag; the existing command tests pass unchanged. A command's options table that defines its own `help` is rejected at compile time (`FlagOptions` forbids the key), and so is a query command that redeclares a common flag (`source-dir`, `target-dir`, `json`).
 
 ### 19.2 Package distribution · `planned`
 

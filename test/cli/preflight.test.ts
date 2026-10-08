@@ -1,27 +1,41 @@
 import { describe, expect, it } from "vitest";
-import { parseFlags } from "../../src/cli/parse-flags.ts";
-import { preflight, SHOW_HELP } from "../../src/cli/preflight.ts";
+import { preflight } from "../../src/cli/preflight.ts";
 
 const HELP = "Usage: md-rag demo\n";
 
 function open(argv: string[], json?: boolean) {
-  return preflight({ command: "demo", help: HELP, json }, () => {
-    const { values } = parseFlags(
+  return preflight(
+    { command: "demo", help: HELP, json },
+    {
       argv,
-      {
+      options: {
         "source-dir": { type: "string" },
         limit: { type: "string" },
-        help: { type: "boolean", short: "h" },
       },
-      false,
-    );
-    if (values.help) return SHOW_HELP;
-    if (values.limit === "bad") throw new Error("not a flag failure");
-    return { sourceDir: values["source-dir"] };
-  });
+      allowPositionals: false,
+    },
+    ({ values }) => {
+      if (values.limit === "bad") throw new Error("not a flag failure");
+      return { sourceDir: values["source-dir"] };
+    },
+  );
 }
 
 describe("preflight", () => {
+  it("does not typecheck an options table that declares its own help", () => {
+    const outcome = preflight(
+      { command: "demo", help: HELP },
+      {
+        argv: ["--help"],
+        // @ts-expect-error `help` is added by parseFlags
+        options: { help: { type: "boolean" } },
+        allowPositionals: false,
+      },
+      () => ({ sourceDir: "docs" }),
+    );
+    expect(outcome.ok).toBe(false);
+  });
+
   it("returns the values with a defined sourceDir", () => {
     expect(open(["--source-dir", "docs"])).toEqual({
       ok: true,

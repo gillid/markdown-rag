@@ -22,21 +22,25 @@ function rejectRepeatedFlags(
   }
 }
 
-/** The one place the commands call `parseArgs`, so none of them can forget to reject a repeated flag. */
-export function parseFlags<Options extends ParseArgsOptionsConfig>(
+const HELP_OPTION = { help: { type: "boolean", short: "h" } } as const;
+
+/** Options tables must not declare `help`: `parseFlags` adds it to every command. */
+export type FlagOptions = ParseArgsOptionsConfig & { help?: never };
+
+/** The one place the commands call `parseArgs`, so none of them can forget to add `--help` or reject a repeated flag. */
+export function parseFlags<Options extends FlagOptions>(
   argv: readonly string[],
   options: Options,
   allowPositionals: boolean,
 ) {
   const { values, positionals, tokens } = parseArgs({
     args: argv,
-    options,
+    options: { ...options, ...HELP_OPTION },
     allowPositionals,
     tokens: true,
   });
+  const help = tokens.some((t) => t.kind === "option" && t.name === "help");
   // `--help` is how a user recovers from a broken command line, so it wins over a repeated flag too.
-  if (!tokens.some((t) => t.kind === "option" && t.name === "help")) {
-    rejectRepeatedFlags(options, tokens);
-  }
-  return { values, positionals };
+  if (!help) rejectRepeatedFlags(options, tokens);
+  return { values, positionals, help };
 }

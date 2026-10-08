@@ -7,14 +7,18 @@ import {
 } from "../engine/index.ts";
 import { wantsJson } from "./failure.ts";
 import { FlagError } from "./flag-error.ts";
-import { commandFailure, preflight, type SHOW_HELP } from "./preflight.ts";
+import type { FlagOptions } from "./parse-flags.ts";
+import { commandFailure, type ParsedFlags, preflight } from "./preflight.ts";
 import type { CliResult } from "./result.ts";
 
 // `argv` is kept raw because `--json` must be readable even when the arguments don't parse.
-export interface QueryCommand {
+export interface QueryCommand<Options extends FlagOptions> {
   command: string;
   help: string;
   argv: readonly string[];
+  /** The command's own flags, merged over `COMMON_OPTIONS`. */
+  options: Options & CommonFlagsAbsent;
+  allowPositionals: boolean;
 }
 
 export interface QueryDeps {
@@ -27,8 +31,10 @@ export const COMMON_OPTIONS = {
   "source-dir": { type: "string" },
   "target-dir": { type: "string" },
   json: { type: "boolean" },
-  help: { type: "boolean", short: "h" },
 } as const;
+
+/** A command's own flags must not redeclare a common one, or the parser and `COMMON_HELP` would disagree. */
+type CommonFlagsAbsent = Partial<Record<keyof typeof COMMON_OPTIONS, never>>;
 
 export const COMMON_HELP = `  --source-dir <dir>  The knowledge base to query (required)
   --target-dir <dir>  The engine folder (default: <source-dir>/.md-rag/)
@@ -59,13 +65,19 @@ export function commonInvocation(
   };
 }
 
-export async function runQuery(
-  { command, help, argv }: QueryCommand,
+export async function runQuery<Options extends FlagOptions>(
+  { command, help, argv, options, allowPositionals }: QueryCommand<Options>,
   deps: QueryDeps,
-  parse: () => QueryInvocation | typeof SHOW_HELP,
+  toInvocation: (
+    parsed: ParsedFlags<typeof COMMON_OPTIONS & Options>,
+  ) => QueryInvocation,
 ): Promise<CliResult> {
   const descriptor = { command, help, json: wantsJson(argv) };
-  const opening = preflight(descriptor, parse);
+  const opening = preflight<typeof COMMON_OPTIONS & Options, QueryInvocation>(
+    descriptor,
+    { argv, options: { ...COMMON_OPTIONS, ...options }, allowPositionals },
+    toInvocation,
+  );
   if (!opening.ok) return opening.result;
   const invocation = opening.values;
 

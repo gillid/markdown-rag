@@ -14,13 +14,10 @@ import {
   optionalInteger,
   parseEnumFlag,
 } from "./flag-values.ts";
-import { parseFlags } from "./parse-flags.ts";
-import { SHOW_HELP } from "./preflight.ts";
 import { renderList } from "./render/render-list.ts";
 import { type CliResult, toJson } from "./result.ts";
 import {
   COMMON_HELP,
-  COMMON_OPTIONS,
   commonInvocation,
   defaultQueryDeps,
   type QueryDeps,
@@ -44,19 +41,19 @@ export function runList(
   argv: readonly string[],
   deps: QueryDeps = defaultQueryDeps,
 ): Promise<CliResult> {
-  return runQuery({ command: "list", help: LIST_HELP, argv }, deps, () => {
-    const { values } = parseFlags(
-      argv,
-      {
-        ...COMMON_OPTIONS,
-        ...FILTER_OPTIONS,
-        sort: { type: "string" },
-        limit: { type: "string" },
-        offset: { type: "string" },
-      },
-      false,
-    );
-    if (values.help) return SHOW_HELP;
+  const query = {
+    command: "list",
+    help: LIST_HELP,
+    argv,
+    options: {
+      ...FILTER_OPTIONS,
+      sort: { type: "string" },
+      limit: { type: "string" },
+      offset: { type: "string" },
+    },
+    allowPositionals: false,
+  } as const;
+  return runQuery(query, deps, ({ values }) => {
     const filter = filterFromFlags(values);
     const sort = parseEnumFlag("sort", LIST_SORTS, values.sort);
     const limit = optionalInteger("limit", values.limit);

@@ -10,8 +10,7 @@ import type { Embedder } from "../models/embedder.ts";
 import { createTransformersEmbedder } from "../models/transformers-embedder.ts";
 import { type EmbedReport, embedKnowledgeBase } from "../sidecars/embed.ts";
 import { loadConfigOutcome } from "./load-config.ts";
-import { parseFlags } from "./parse-flags.ts";
-import { preflight, SHOW_HELP } from "./preflight.ts";
+import { preflight } from "./preflight.ts";
 import type { CliResult } from "./result.ts";
 
 export const EMBED_HELP = `Usage: md-rag embed --source-dir <dir> [options]
@@ -39,28 +38,27 @@ export async function runEmbed(
   argv: readonly string[],
   deps: EmbedDeps = defaultDeps,
 ): Promise<CliResult> {
-  const opening = preflight({ command: "embed", help: EMBED_HELP }, () => {
-    const { values } = parseFlags(
+  const opening = preflight(
+    { command: "embed", help: EMBED_HELP },
+    {
       argv,
-      {
+      options: {
         "source-dir": { type: "string" },
         "target-dir": { type: "string" },
         "models-dir": { type: "string" },
         offline: { type: "boolean" },
         rechunk: { type: "boolean" },
-        help: { type: "boolean", short: "h" },
       },
-      false,
-    );
-    if (values.help) return SHOW_HELP;
-    return {
+      allowPositionals: false,
+    },
+    ({ values }) => ({
       sourceDir: values["source-dir"],
       targetDir: values["target-dir"],
       modelsDir: values["models-dir"],
       offline: values.offline === true,
       rechunk: values.rechunk === true,
-    };
-  });
+    }),
+  );
   if (!opening.ok) return opening.result;
   const { sourceDir, targetDir, modelsDir, offline, rechunk } = opening.values;
 

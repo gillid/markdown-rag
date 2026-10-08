@@ -5,13 +5,10 @@ import {
   filterFromFlags,
 } from "./filter-flags.ts";
 import { checkAgainstSchema } from "./flag-values.ts";
-import { parseFlags } from "./parse-flags.ts";
-import { SHOW_HELP } from "./preflight.ts";
 import { renderOverview } from "./render/render-overview.ts";
 import { type CliResult, toJson } from "./result.ts";
 import {
   COMMON_HELP,
-  COMMON_OPTIONS,
   commonInvocation,
   defaultQueryDeps,
   type QueryDeps,
@@ -32,26 +29,23 @@ export function runOverview(
   argv: readonly string[],
   deps: QueryDeps = defaultQueryDeps,
 ): Promise<CliResult> {
-  return runQuery(
-    { command: "overview", help: OVERVIEW_HELP, argv },
-    deps,
-    () => {
-      const { values } = parseFlags(
-        argv,
-        { ...COMMON_OPTIONS, ...FILTER_OPTIONS },
-        false,
-      );
-      if (values.help) return SHOW_HELP;
-      const filter = filterFromFlags(values);
-      checkAgainstSchema(filterSchema, filter);
-      return {
-        ...commonInvocation(values),
-        loadModels: false,
-        async operation(engine) {
-          const overview = await engine.overview(filter);
-          return values.json ? toJson(overview) : renderOverview(overview);
-        },
-      };
-    },
-  );
+  const query = {
+    command: "overview",
+    help: OVERVIEW_HELP,
+    argv,
+    options: FILTER_OPTIONS,
+    allowPositionals: false,
+  } as const;
+  return runQuery(query, deps, ({ values }) => {
+    const filter = filterFromFlags(values);
+    checkAgainstSchema(filterSchema, filter);
+    return {
+      ...commonInvocation(values),
+      loadModels: false,
+      async operation(engine) {
+        const overview = await engine.overview(filter);
+        return values.json ? toJson(overview) : renderOverview(overview);
+      },
+    };
+  });
 }
