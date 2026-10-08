@@ -84,7 +84,7 @@ const engine = await createEngine({ sourceDir: "./docs" });
 const { results } = await engine.search({ query: "rate limit errors", limit: 5 });
 ```
 
-`createHttpHandler(createEngine({ sourceDir: "./docs" }))` takes the engine promise (so you can mount it before the models have loaded) and returns a plain `(req, res)` handler for your own server.
+`createHttpHandler(createEngine({ sourceDir: "./docs" }))` (also imported from `markdown-rag`) takes the engine promise (so you can mount it before the models have loaded) and returns a plain `(req, res)` handler for your own server.
 
 ## Using it from an agent
 

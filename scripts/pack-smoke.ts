@@ -97,7 +97,11 @@ try {
   });
   const check = runBin(bin, ["check", "--source-dir", knowledgeBase]);
   const checkOutput = check.stdout + check.stderr;
-  if (check.status === 0 || !checkOutput.includes("Run md-rag embed first")) {
+  if (
+    check.status === 0 ||
+    !checkOutput.includes("Run md-rag embed first") ||
+    checkOutput.includes("failed the contract")
+  ) {
     fail(`md-rag check did not stop at the missing sidecars:\n${checkOutput}`);
   }
 
