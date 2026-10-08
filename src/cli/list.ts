@@ -60,7 +60,7 @@ export function runList(
     const filter = filterFromFlags(values);
     const sort = parseEnumFlag("sort", LIST_SORTS, values.sort);
     const limit = optionalInteger("limit", values.limit);
-    const offset = optionalInteger("offset", values.offset) ?? 0;
+    const offset = optionalInteger("offset", values.offset);
     const request = { filter, sort, limit, offset };
     checkAgainstSchema(listRequestSchema, request);
     return {
@@ -68,7 +68,7 @@ export function runList(
       loadModels: false,
       async operation(engine) {
         const list = await engine.listDocuments(request);
-        return values.json ? toJson(list) : renderList(list, offset);
+        return values.json ? toJson(list) : renderList(list);
       },
     };
   });

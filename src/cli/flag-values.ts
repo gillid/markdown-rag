@@ -1,7 +1,6 @@
 import { z } from "zod";
+import { PLAIN_NUMBER } from "../plain-number.ts";
 import { FlagError } from "./flag-error.ts";
-
-const NUMBER = /^[+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?$/;
 
 // The engine would reject these too, but only after the index is built and the models are loaded.
 export function checkAgainstSchema(schema: z.ZodType, request: unknown): void {
@@ -26,9 +25,8 @@ export function parseEnumFlag<Value extends string>(
   return value;
 }
 
-/** `Number("")` is 0 and `Number("0x10")` is 16, so the text is checked before it is converted. */
 export function parseNumberFlag(flag: string, text: string): number {
-  if (!NUMBER.test(text)) {
+  if (!PLAIN_NUMBER.test(text)) {
     throw new FlagError(`--${flag} must be a number, got "${text}"`);
   }
   const value = Number(text);

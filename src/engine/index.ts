@@ -1,4 +1,9 @@
 export type { ConfigInput } from "../config/config.ts";
+export {
+  createHttpHandler,
+  type HttpHandler,
+  type HttpHandlerOptions,
+} from "../http/handler.ts";
 export { type Filter, filterSchema } from "../index/filter.ts";
 export { createEngine } from "./create-engine.ts";
 export type { EngineOptions } from "./engine-options.ts";

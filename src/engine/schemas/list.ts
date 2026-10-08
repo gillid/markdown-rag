@@ -18,6 +18,9 @@ export type ListRequest = z.input<typeof listRequestSchema>;
 
 export const documentListSchema = z.strictObject({
   total: z.number(),
+  /** What the engine applied, defaults included, so a client reports the page it got rather than the one it asked for. */
+  offset: z.number(),
+  limit: z.number(),
   documents: z.array(documentSummarySchema),
   index_version: z.string(),
 });

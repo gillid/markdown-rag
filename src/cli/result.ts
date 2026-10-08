@@ -16,4 +16,6 @@ export interface CliResult {
   readonly exitCode: number;
   readonly stdout: string;
   readonly stderr: string;
+  /** Exit as soon as the output is written, without waiting for work the command abandoned. */
+  readonly stopProcess?: boolean;
 }

@@ -1,0 +1,186 @@
+import { ConfigError, type ConfigInput, loadConfig } from "../config/config.ts";
+import {
+  createEngine,
+  type Engine,
+  type EngineOptions,
+} from "../engine/index.ts";
+import { errorMessage } from "../errors.ts";
+import { createHttpHandler } from "../http/handler.ts";
+import { loopbackNames } from "../http/loopback.ts";
+import { listen } from "../http/server.ts";
+import { failure } from "./failure.ts";
+import { FlagError } from "./flag-error.ts";
+import { parseIntegerFlag } from "./flag-values.ts";
+import { parseFlags } from "./parse-flags.ts";
+import type { CliResult } from "./result.ts";
+import { isFlagFailure, SHOW_HELP } from "./run-query.ts";
+
+export const DEFAULT_PORT = 3000;
+// No auth in the PoC, so the default keeps the server to this machine.
+export const DEFAULT_HOST = "127.0.0.1";
+const MAX_PORT = 65535;
+
+export const SERVE_HELP = `Usage: md-rag serve --source-dir <dir> [options]
+
+Serves the knowledge base over HTTP: GET /overview, POST /search,
+GET /documents, GET /documents/{ref}, GET /healthz and GET /readyz. It starts
+listening at once and answers 503 until the index is built and the models
+are loaded (/readyz turns 200 then). Logs go to stderr. SIGTERM or SIGINT
+stops it after the requests in flight finish.
+
+Options:
+  --port <n>          Port to listen on (default ${DEFAULT_PORT}; 0 picks a free one)
+  --host <address>    Address to bind (default ${DEFAULT_HOST}, this machine only; a container
+                      needs 0.0.0.0. There is no auth, so put network controls in front)
+  --models-dir <dir>  The model cache (default: <target-dir>/models/)
+  --offline           Never download models; fail if they are not cached
+  --source-dir <dir>  The knowledge base to serve (required)
+  --target-dir <dir>  The engine folder (default: <source-dir>/.md-rag/)
+  -h, --help          Show this help message
+`;
+
+export interface ServeDeps {
+  createEngine(input: ConfigInput, options: EngineOptions): Promise<Engine>;
+  /** Aborted when the process should stop serving. */
+  shutdown: AbortSignal;
+  log(message: string): void;
+}
+
+/** Stops on SIGTERM (a deployment) or SIGINT (a terminal). */
+export function processServeDeps(): ServeDeps {
+  const controller = new AbortController();
+  process.once("SIGTERM", () => controller.abort());
+  process.once("SIGINT", () => controller.abort());
+  return {
+    createEngine,
+    shutdown: controller.signal,
+    log: (message) => process.stderr.write(`${message}\n`),
+  };
+}
+
+/** Resolves true when the engine failed to start, false when the process was told to stop. */
+function untilStoppedOrFailed(
+  engine: Promise<Engine>,
+  shutdown: AbortSignal,
+): Promise<boolean> {
+  return new Promise((resolve) => {
+    if (shutdown.aborted) return resolve(false);
+    shutdown.addEventListener("abort", () => resolve(false), { once: true });
+    engine.catch(() => resolve(true));
+  });
+}
+
+export async function runServe(
+  argv: readonly string[],
+  suppliedDeps?: ServeDeps,
+): Promise<CliResult> {
+  const fail = (kind: "usage" | "startup", cause: unknown) =>
+    failure("serve", kind, errorMessage(cause), {
+      json: false,
+      help: SERVE_HELP,
+    });
+
+  let values: ReturnType<typeof parseServeFlags>;
+  try {
+    values = parseServeFlags(argv);
+  } catch (cause) {
+    if (isFlagFailure(cause)) return fail("usage", cause);
+    throw cause;
+  }
+  if (values === SHOW_HELP)
+    return { exitCode: 0, stdout: SERVE_HELP, stderr: "" };
+  if (values.sourceDir === undefined) {
+    return fail("usage", "--source-dir is required");
+  }
+
+  const input: ConfigInput = {
+    sourceDir: values.sourceDir,
+    targetDir: values.targetDir,
+    modelsDir: values.modelsDir,
+    allowRemoteModels: values.offline ? false : undefined,
+  };
+  // A rejected setting is the caller's to fix, so it is reported before the port opens or a model loads.
+  try {
+    loadConfig(input);
+  } catch (cause) {
+    if (cause instanceof ConfigError) return fail("usage", cause);
+    throw cause;
+  }
+
+  const deps = suppliedDeps ?? processServeDeps();
+  // The engine starts only once the port is bound, so a taken port wastes no model load.
+  let startEngine: () => void = () => {};
+  const engine = new Promise<Engine>((resolve, reject) => {
+    startEngine = () => {
+      try {
+        resolve(deps.createEngine(input, { loadModels: true }));
+      } catch (cause) {
+        reject(cause);
+      }
+    };
+  });
+  const ownNames = loopbackNames(values.host);
+  let server: Awaited<ReturnType<typeof listen>>;
+  try {
+    server = await listen(
+      createHttpHandler(engine, { log: deps.log, allowedHosts: ownNames }),
+      { port: values.port, host: values.host },
+      deps.log,
+    );
+  } catch (cause) {
+    return fail("startup", cause);
+  }
+  deps.log(`md-rag: listening on ${server.host}:${server.port}`);
+  if (ownNames === undefined) {
+    deps.log(
+      "md-rag: reachable beyond this machine, with no auth and no Host check; put network controls in front",
+    );
+  }
+  if (!deps.shutdown.aborted) startEngine();
+
+  const startupFailed = await untilStoppedOrFailed(engine, deps.shutdown);
+  await server.close();
+  // Exits at once because a model load in flight must not keep a stopped server alive; the cache is written via temp file and rename, so that is safe.
+  return {
+    exitCode: startupFailed ? 1 : 0,
+    stdout: "",
+    stderr: "",
+    stopProcess: true,
+  };
+}
+
+function parseServeFlags(argv: readonly string[]) {
+  const { values } = parseFlags(
+    argv,
+    {
+      "source-dir": { type: "string" },
+      "target-dir": { type: "string" },
+      "models-dir": { type: "string" },
+      offline: { type: "boolean" },
+      port: { type: "string" },
+      host: { type: "string" },
+      help: { type: "boolean", short: "h" },
+    },
+    false,
+  );
+  // Help wins over every flag value, so a bad --port must not be reported before it.
+  if (values.help) return SHOW_HELP;
+  const port =
+    values.port === undefined
+      ? DEFAULT_PORT
+      : parseIntegerFlag("port", values.port);
+  if (port < 0 || port > MAX_PORT) {
+    throw new FlagError(
+      `--port must be between 0 and ${MAX_PORT}, got ${port}`,
+    );
+  }
+  if (values.host === "") throw new FlagError("--host must not be empty");
+  return {
+    sourceDir: values["source-dir"],
+    targetDir: values["target-dir"],
+    modelsDir: values["models-dir"],
+    offline: values.offline === true,
+    port,
+    host: values.host ?? DEFAULT_HOST,
+  };
+}
