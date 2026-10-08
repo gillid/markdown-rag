@@ -6,6 +6,7 @@ import { runList } from "./list.ts";
 import { runOverview } from "./overview.ts";
 import type { CliResult } from "./result.ts";
 import { runSearch } from "./search.ts";
+import { runServe } from "./serve.ts";
 
 export const HELP = `Usage: md-rag <command> [options]
 
@@ -16,6 +17,7 @@ Commands:
   search    Ranked, cited search
   list      List documents, unranked
   get       Print one document or section
+  serve     Serve the knowledge base over HTTP
 
 Options:
   -h, --help  Show this help message
@@ -52,14 +54,29 @@ export async function run(argv: readonly string[]): Promise<CliResult> {
     return runGet(rest);
   }
 
+  if (command === "serve") {
+    return runServe(rest);
+  }
+
   return { exitCode: 1, stdout: "", stderr: `Unknown command\n\n${HELP}` };
 }
 
+function write(stream: NodeJS.WriteStream, text: string): Promise<void> {
+  return new Promise((resolve) => {
+    if (text) stream.write(text, () => resolve());
+    else resolve();
+  });
+}
+
 async function main(): Promise<void> {
-  const result = await run(process.argv.slice(2));
-  if (result.stdout) process.stdout.write(result.stdout);
-  if (result.stderr) process.stderr.write(result.stderr);
+  const argv = process.argv.slice(2);
+  const result = await run(argv);
+  await Promise.all([
+    write(process.stdout, result.stdout),
+    write(process.stderr, result.stderr),
+  ]);
   process.exitCode = result.exitCode;
+  if (result.stopProcess) process.exit();
 }
 
 if (
