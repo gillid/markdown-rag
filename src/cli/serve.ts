@@ -9,8 +9,7 @@ import { loopbackNames } from "../http/loopback.ts";
 import { listen } from "../http/server.ts";
 import { FlagError } from "./flag-error.ts";
 import { parseIntegerFlag } from "./flag-values.ts";
-import { parseFlags } from "./parse-flags.ts";
-import { commandFailure, preflight, SHOW_HELP } from "./preflight.ts";
+import { commandFailure, type ParsedFlags, preflight } from "./preflight.ts";
 import type { CliResult } from "./result.ts";
 
 export const DEFAULT_PORT = 3000;
@@ -73,7 +72,11 @@ export async function runServe(
   suppliedDeps?: ServeDeps,
 ): Promise<CliResult> {
   const descriptor = { command: "serve", help: SERVE_HELP };
-  const opening = preflight(descriptor, () => parseServeFlags(argv));
+  const opening = preflight(
+    descriptor,
+    { argv, options: SERVE_OPTIONS, allowPositionals: false },
+    serveValues,
+  );
   if (!opening.ok) return opening.result;
   const { values } = opening;
 
@@ -135,22 +138,16 @@ export async function runServe(
   };
 }
 
-function parseServeFlags(argv: readonly string[]) {
-  const { values } = parseFlags(
-    argv,
-    {
-      "source-dir": { type: "string" },
-      "target-dir": { type: "string" },
-      "models-dir": { type: "string" },
-      offline: { type: "boolean" },
-      port: { type: "string" },
-      host: { type: "string" },
-      help: { type: "boolean", short: "h" },
-    },
-    false,
-  );
-  // Help wins over every flag value, so a bad --port must not be reported before it.
-  if (values.help) return SHOW_HELP;
+const SERVE_OPTIONS = {
+  "source-dir": { type: "string" },
+  "target-dir": { type: "string" },
+  "models-dir": { type: "string" },
+  offline: { type: "boolean" },
+  port: { type: "string" },
+  host: { type: "string" },
+} as const;
+
+function serveValues({ values }: ParsedFlags<typeof SERVE_OPTIONS>) {
   const port =
     values.port === undefined
       ? DEFAULT_PORT

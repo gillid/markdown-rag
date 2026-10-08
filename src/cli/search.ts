@@ -13,13 +13,10 @@ import {
   parseEnumFlag,
   parseNamedNumbers,
 } from "./flag-values.ts";
-import { parseFlags } from "./parse-flags.ts";
-import { SHOW_HELP } from "./preflight.ts";
 import { renderSearch } from "./render/render-search.ts";
 import { type CliResult, toJson } from "./result.ts";
 import {
   COMMON_HELP,
-  COMMON_OPTIONS,
   commonInvocation,
   defaultQueryDeps,
   onlyPositional,
@@ -50,23 +47,23 @@ export function runSearch(
   argv: readonly string[],
   deps: QueryDeps = defaultQueryDeps,
 ): Promise<CliResult> {
-  return runQuery({ command: "search", help: SEARCH_HELP, argv }, deps, () => {
-    const { values, positionals } = parseFlags(
-      argv,
-      {
-        ...COMMON_OPTIONS,
-        ...FILTER_OPTIONS,
-        mode: { type: "string" },
-        limit: { type: "string" },
-        "min-score": { type: "string" },
-        expand: { type: "string" },
-        weight: { type: "string", multiple: true },
-        "models-dir": { type: "string" },
-        offline: { type: "boolean" },
-      },
-      true,
-    );
-    if (values.help) return SHOW_HELP;
+  const query = {
+    command: "search",
+    help: SEARCH_HELP,
+    argv,
+    options: {
+      ...FILTER_OPTIONS,
+      mode: { type: "string" },
+      limit: { type: "string" },
+      "min-score": { type: "string" },
+      expand: { type: "string" },
+      weight: { type: "string", multiple: true },
+      "models-dir": { type: "string" },
+      offline: { type: "boolean" },
+    },
+    allowPositionals: true,
+  } as const;
+  return runQuery(query, deps, ({ values, positionals }) => {
     const request = {
       query: onlyPositional("query", positionals),
       filter: filterFromFlags(values),

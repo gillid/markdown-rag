@@ -10,8 +10,7 @@ import { readSidecarEntries } from "../sidecars/read-entries.ts";
 import { SidecarError } from "../sidecars/sidecar.ts";
 import { verifySidecars } from "../sidecars/verify-chunks.ts";
 import { loadConfigOutcome } from "./load-config.ts";
-import { parseFlags } from "./parse-flags.ts";
-import { preflight, SHOW_HELP } from "./preflight.ts";
+import { preflight } from "./preflight.ts";
 import type { CliResult } from "./result.ts";
 
 export const CHECK_HELP = `Usage: md-rag check --source-dir <dir> [options]
@@ -29,22 +28,21 @@ Options:
 
 /** Reports contract errors and sidecar freshness problems together; it is meant to run after `embed` (ADR-038). */
 export async function runCheck(argv: readonly string[]): Promise<CliResult> {
-  const opening = preflight({ command: "check", help: CHECK_HELP }, () => {
-    const { values } = parseFlags(
+  const opening = preflight(
+    { command: "check", help: CHECK_HELP },
+    {
       argv,
-      {
+      options: {
         "source-dir": { type: "string" },
         "target-dir": { type: "string" },
-        help: { type: "boolean", short: "h" },
       },
-      false,
-    );
-    if (values.help) return SHOW_HELP;
-    return {
+      allowPositionals: false,
+    },
+    ({ values }) => ({
       sourceDir: values["source-dir"],
       targetDir: values["target-dir"],
-    };
-  });
+    }),
+  );
   if (!opening.ok) return opening.result;
   const { sourceDir, targetDir } = opening.values;
 

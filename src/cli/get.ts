@@ -1,10 +1,7 @@
-import { parseFlags } from "./parse-flags.ts";
-import { SHOW_HELP } from "./preflight.ts";
 import { renderGet } from "./render/render-get.ts";
 import { type CliResult, toJson } from "./result.ts";
 import {
   COMMON_HELP,
-  COMMON_OPTIONS,
   commonInvocation,
   defaultQueryDeps,
   onlyPositional,
@@ -26,13 +23,14 @@ export function runGet(
   argv: readonly string[],
   deps: QueryDeps = defaultQueryDeps,
 ): Promise<CliResult> {
-  return runQuery({ command: "get", help: GET_HELP, argv }, deps, () => {
-    const { values, positionals } = parseFlags(
-      argv,
-      { ...COMMON_OPTIONS, "no-body": { type: "boolean" } },
-      true,
-    );
-    if (values.help) return SHOW_HELP;
+  const query = {
+    command: "get",
+    help: GET_HELP,
+    argv,
+    options: { "no-body": { type: "boolean" } },
+    allowPositionals: true,
+  } as const;
+  return runQuery(query, deps, ({ values, positionals }) => {
     const ref = onlyPositional("ref", positionals);
     return {
       ...commonInvocation(values),

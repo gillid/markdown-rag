@@ -2,10 +2,8 @@ import type { FailureKind } from "../engine/failure-kind.ts";
 import { errorMessage, isErrnoException } from "../errors.ts";
 import { failure } from "./failure.ts";
 import { FlagError } from "./flag-error.ts";
+import { type FlagOptions, parseFlags } from "./parse-flags.ts";
 import type { CliResult } from "./result.ts";
-
-// Returned instead of values so that help wins over every flag value.
-export const SHOW_HELP = "help";
 
 export interface PreflightCommand {
   command: string;
@@ -35,14 +33,38 @@ export function commandFailure(
   return failure(command, kind, errorMessage(cause), { json, help });
 }
 
-/** The opening every command shares: parse the flags, let `--help` win, and require `--source-dir`. */
-export function preflight<Values extends { sourceDir?: string }>(
+export interface FlagSpec<Options extends FlagOptions> {
+  argv: readonly string[];
+  /** The command's own flags; `--help` is added by `parseFlags`. */
+  options: Options;
+  allowPositionals: boolean;
+}
+
+// `help` is left out: a command's step only runs when it was not requested.
+export type ParsedFlags<Options extends FlagOptions> = Omit<
+  ReturnType<typeof parseFlags<Options>>,
+  "help"
+>;
+
+/** The opening every command shares: parse the flags, let `--help` win over every flag value, and require `--source-dir`. */
+export function preflight<
+  Options extends FlagOptions,
+  Values extends { sourceDir?: string },
+>(
   command: PreflightCommand,
-  parse: () => Values | typeof SHOW_HELP,
+  { argv, options, allowPositionals }: FlagSpec<Options>,
+  toValues: (parsed: ParsedFlags<NoInfer<Options>>) => Values,
 ): Preflight<Values> {
-  let values: Values | typeof SHOW_HELP;
+  let values: Values;
   try {
-    values = parse();
+    const parsed = parseFlags(argv, options, allowPositionals);
+    if (parsed.help) {
+      return {
+        ok: false,
+        result: { exitCode: 0, stdout: command.help, stderr: "" },
+      };
+    }
+    values = toValues(parsed);
   } catch (cause) {
     if (isFlagFailure(cause)) {
       return { ok: false, result: commandFailure(command, "usage", cause) };
@@ -50,12 +72,6 @@ export function preflight<Values extends { sourceDir?: string }>(
     throw cause;
   }
 
-  if (values === SHOW_HELP) {
-    return {
-      ok: false,
-      result: { exitCode: 0, stdout: command.help, stderr: "" },
-    };
-  }
   const { sourceDir } = values;
   if (sourceDir === undefined) {
     return {
