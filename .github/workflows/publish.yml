@@ -2,14 +2,14 @@ name: Publish
 
 on:
   push:
-    tags: ["v*"]
+    branches: [main]
 
 concurrency:
   group: publish
   cancel-in-progress: false
 
 permissions:
-  contents: read
+  contents: write
   id-token: write
 
 jobs:
@@ -17,26 +17,54 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-        with:
-          fetch-depth: 0
-      - name: Check the tagged commit is on main
-        run: git merge-base --is-ancestor "$GITHUB_SHA" origin/main
-      - uses: pnpm/action-setup@v6
-      - uses: actions/setup-node@v6
+      - name: Look for an unpublished version
+        id: release
+        run: |
+          name=$(node -p "require('./package.json').name")
+          version=$(node -p "require('./package.json').version")
+          if npm view "$name@$version" version > /dev/null 2>&1; then
+            echo "$name@$version is already on npm, nothing to release"
+            echo "needed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "needed=true" >> "$GITHUB_OUTPUT"
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "tarball=$RUNNER_TEMP/$name-$version.tgz" >> "$GITHUB_OUTPUT"
+      - if: steps.release.outputs.needed == 'true'
+        uses: pnpm/action-setup@v6
+      - if: steps.release.outputs.needed == 'true'
+        uses: actions/setup-node@v6
         with:
           node-version: 24
           cache: pnpm
           registry-url: https://registry.npmjs.org
-      - run: pnpm install --frozen-lockfile
-      - name: Check the tag matches package.json
-        run: test "v$(node -p "require('./package.json').version")" = "$GITHUB_REF_NAME"
-      - run: pnpm lint
-      - run: pnpm typecheck
-      - run: pnpm test
+      - if: steps.release.outputs.needed == 'true'
+        run: pnpm install --frozen-lockfile
+      - if: steps.release.outputs.needed == 'true'
+        run: pnpm lint
+      - if: steps.release.outputs.needed == 'true'
+        run: pnpm typecheck
+      - if: steps.release.outputs.needed == 'true'
+        run: pnpm test
       # pnpm pack applies publishConfig; npm publish then ships that same tarball as-is, with OIDC provenance.
-      - run: pnpm pack --pack-destination "$RUNNER_TEMP"
-      - run: pnpm test:pack "$RUNNER_TEMP/markdown-rag-${GITHUB_REF_NAME#v}.tgz"
+      - if: steps.release.outputs.needed == 'true'
+        run: pnpm pack --pack-destination "$RUNNER_TEMP"
+      - if: steps.release.outputs.needed == 'true'
+        run: pnpm test:pack "${{ steps.release.outputs.tarball }}"
       - name: Publish (prereleases go to the next tag, never latest)
+        if: steps.release.outputs.needed == 'true'
         run: |
-          case "$GITHUB_REF_NAME" in *-*) dist_tag=next ;; *) dist_tag=latest ;; esac
-          npm publish "$RUNNER_TEMP/markdown-rag-${GITHUB_REF_NAME#v}.tgz" --provenance --access public --tag "$dist_tag"
+          case "${{ steps.release.outputs.version }}" in *-*) dist_tag=next ;; *) dist_tag=latest ;; esac
+          npm publish "${{ steps.release.outputs.tarball }}" --provenance --access public --tag "$dist_tag"
+      # Runs on every push, so a release whose tag push failed is tagged by the next run.
+      - name: Tag the release
+        run: |
+          tag="v${{ steps.release.outputs.version }}"
+          if git ls-remote --exit-code --tags origin "refs/tags/$tag" > /dev/null; then
+            echo "$tag already exists"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag "$tag"
+          git push origin "$tag"
