@@ -30,7 +30,6 @@ describe("loadKnowledgeBase against static fixtures", () => {
     const full = documents.find((d) => d.path === "full.md");
     expect(full?.title).toBe("Full Document");
     expect(full?.tags).toEqual(["runbook", "payments"]);
-    expect(full?.signals).toEqual({ authority: 0.8, curated: 1 });
     expect(full?.meta).toEqual({ source_id: "ext-123" });
   });
 
@@ -45,9 +44,7 @@ describe("loadKnowledgeBase against static fixtures", () => {
         "bad-yaml.md",
         "missing-frontmatter.md",
         "missing-title.md",
-        "reserved-signal-name.md",
-        "signal-out-of-range.md",
-        "signal-uppercase.md",
+        "missing-tags.md",
       ].sort(),
     );
     expect(errors.every((e) => e.reason.length > 0)).toBe(true);
@@ -78,7 +75,7 @@ describe("loadKnowledgeBase walking", () => {
     [
       "---",
       `title: "${title}"`,
-      "source: docs",
+      "tags: []",
       'updated_at: "2026-01-15"',
       "---",
       "",

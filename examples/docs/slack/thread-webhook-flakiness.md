@@ -1,9 +1,8 @@
 ---
 title: "Slack thread: integrator says our webhooks look forged"
-source: slack
 updated_at: "2026-04-03"
 channel: "#dev-support"
-tags: [api]
+tags: [api, slack]
 ---
 
 # Slack thread: integrator says our webhooks look forged

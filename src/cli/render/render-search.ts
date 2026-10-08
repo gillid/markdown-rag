@@ -16,9 +16,7 @@ function quote(text: string): string {
 
 function renderResult(result: SearchResult): string {
   const facts = [
-    `source: ${result.source}`,
     `updated: ${formatDate(result.updated_at)}`,
-    ...(result.url === undefined ? [] : [`url: ${result.url}`]),
     `ref: ${result.ref}`,
     `score: ${formatScore(result.scores.final)}`,
   ];

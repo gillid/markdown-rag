@@ -1,9 +1,8 @@
 ---
 title: "Slack thread: why did that customer get charged twice"
-source: slack
 updated_at: "2026-07-09"
 channel: "#payments-eng"
-tags: [payments]
+tags: [payments, slack]
 ---
 
 # Slack thread: why did that customer get charged twice

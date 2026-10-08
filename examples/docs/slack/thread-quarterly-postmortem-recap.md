@@ -1,9 +1,8 @@
 ---
 title: "Slack thread: Q2 incident recap before the all-hands"
-source: slack
 updated_at: "2026-06-25"
 channel: "#eng-leads"
-tags: [incidents, process]
+tags: [incidents, process, slack]
 ---
 
 # Slack thread: Q2 incident recap before the all-hands

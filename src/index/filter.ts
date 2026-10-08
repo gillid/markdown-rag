@@ -19,7 +19,6 @@ const relativeDir = z
 
 /** The filter every operation shares (ADR-035); strict, so a misspelt field is an error rather than "no constraint". */
 export const filterSchema = z.strictObject({
-  sources: nameList.optional(),
   tags: nameList.optional(),
   tags_any: nameList.optional(),
   // Matches documents anywhere beneath it; `./a`, `/a` and `a/` all name `a` (see `normaliseDir`).
@@ -44,9 +43,6 @@ function normaliseDir(dir: string | undefined): string | undefined {
 export function toWhere(filter: Filter = {}): Where | undefined {
   const dir = normaliseDir(filter.dir);
   const clauses: Where[] = [];
-  if (isPresent(filter.sources)) {
-    clauses.push({ source: { in: filter.sources } });
-  }
   if (isPresent(filter.tags)) {
     clauses.push({ tags: { containsAll: filter.tags } });
   }
@@ -64,13 +60,12 @@ export function toWhere(filter: Filter = {}): Where | undefined {
 
 /** The same semantics as `toWhere`, over document summaries, for the unranked operations. */
 export function matchesFilter(
-  summary: Pick<DocumentSummary, "path" | "source" | "tags" | "updatedAt">,
+  summary: Pick<DocumentSummary, "path" | "tags" | "updatedAt">,
   filter: Filter = {},
 ): boolean {
-  const { sources, tags, tags_any, updated_after } = filter;
+  const { tags, tags_any, updated_after } = filter;
   const dir = normaliseDir(filter.dir);
   return (
-    (!isPresent(sources) || sources.includes(summary.source)) &&
     (!isPresent(tags) || tags.every((tag) => summary.tags.includes(tag))) &&
     (!isPresent(tags_any) ||
       tags_any.some((tag) => summary.tags.includes(tag))) &&

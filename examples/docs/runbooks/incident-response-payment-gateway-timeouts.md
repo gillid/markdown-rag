@@ -1,9 +1,7 @@
 ---
 title: "Incident Response: Payment Gateway Timeouts"
-source: runbook
 updated_at: "2026-06-12"
-url: "https://runbooks.internal.orbitside.dev/payment-gateway-timeouts"
-tags: [payments, incidents, on-call]
+tags: [payments, incidents, on-call, runbook]
 ---
 
 # Incident Response: Payment Gateway Timeouts

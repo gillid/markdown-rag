@@ -64,7 +64,7 @@ export async function startEngine(
 
   const index = await loadIndex(config);
   // Checked even without models, so `loadModels: false` never hides a setting that `search` would reject.
-  const defaults = resolveDefaults(config.retrieval, index.documents.values());
+  const defaults = resolveDefaults(config.retrieval);
   const retrieve = loadModels
     ? await startRetriever(config, index, defaults, injected)
     : undefined;

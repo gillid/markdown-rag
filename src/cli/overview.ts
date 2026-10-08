@@ -17,9 +17,9 @@ import {
 
 export const OVERVIEW_HELP = `Usage: md-rag overview --source-dir <dir> [options]
 
-Counts the documents and chunks, then lists every source, tag and declared
-signal with its document count, all within the filter. Run it first to learn
-the real values to filter by.
+Counts the documents and chunks, then lists every tag with its document
+count, all within the filter. Run it first to learn the real values to filter
+by.
 
 Options:
 ${COMMON_HELP}

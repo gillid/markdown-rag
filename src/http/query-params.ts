@@ -3,13 +3,7 @@ import { type ListRequest, listRequestSchema } from "../engine/schemas/list.ts";
 import { type Filter, filterSchema } from "../index/filter.ts";
 import { PLAIN_NUMBER } from "../plain-number.ts";
 
-export const FILTER_PARAMS = [
-  "source",
-  "tag",
-  "tag_any",
-  "dir",
-  "updated_after",
-];
+export const FILTER_PARAMS = ["tag", "tag_any", "dir", "updated_after"];
 
 export const LIST_PARAMS = [...FILTER_PARAMS, "sort", "limit", "offset"];
 
@@ -57,7 +51,6 @@ function listParam(
 /** The one place query parameters become filter fields, for `/overview` and `/documents`. List fields repeat: `?tag=a&tag=b`. The schema validates them. */
 function filterFields(params: URLSearchParams) {
   return {
-    sources: listParam(params, "source"),
     tags: listParam(params, "tag"),
     tags_any: listParam(params, "tag_any"),
     dir: single(params, "dir"),

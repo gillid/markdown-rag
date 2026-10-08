@@ -1,15 +1,10 @@
-import type { IndexedDocument } from "../index/knowledge-index.ts";
 import { SEARCH_MODES, type SearchMode } from "../index/search-mode.ts";
 import {
   requirePositive,
   validateHybridWeights,
 } from "../index/validate-query.ts";
 import { RetrievalOptionError } from "./errors.ts";
-import {
-  declaredSignals,
-  type SignalWeights,
-  validateWeights,
-} from "./signals.ts";
+import { type SignalWeights, validateWeights } from "./signals.ts";
 import {
   DEFAULT_RETRIEVAL,
   MAX_EXPAND,
@@ -75,21 +70,17 @@ export function validateOptions(options: {
   }
 }
 
-/** The configured defaults over the built-in ones, checked against the signals the documents declare. Needs no models. */
+/** The configured defaults over the built-in ones, checked. Needs no models. */
 export function resolveDefaults(
   overrides: Partial<RetrievalDefaults> | undefined,
-  documents: Iterable<IndexedDocument>,
 ): RetrievalDefaults {
   const defaults = withDefaults(overrides);
-  validateDefaults(defaults, declaredSignals(documents));
+  validateDefaults(defaults);
   return defaults;
 }
 
-function validateDefaults(
-  defaults: RetrievalDefaults,
-  declaredSignals: ReadonlySet<string>,
-): void {
-  validateWeights(defaults.weights, declaredSignals);
+function validateDefaults(defaults: RetrievalDefaults): void {
+  validateWeights(defaults.weights);
   requireInteger("candidates", defaults.candidates, 1, Number.MAX_SAFE_INTEGER);
   validateOptions(defaults);
   requirePositive("halfLifeDays", defaults.halfLifeDays);

@@ -27,7 +27,7 @@ import {
 export const SEARCH_HELP = `Usage: md-rag search "<query>" --source-dir <dir> [options]
 
 Ranked, cited search. Each result prints a heading from its breadcrumb, one
-line with its source, updated date, url, ref and final score, then the
+line with its updated date, ref and final score, then the
 snippet. Pass a result's ref to \`get\` to read more of the document. Put \`--\`
 before a query that starts with a dash: md-rag search --source-dir docs -- "-v flag".
 
@@ -37,7 +37,7 @@ Options:
   --min-score <x>     Drop results whose relevance is below x; write a negative
                       value with an equals sign: --min-score=-0.5
   --expand <n>        Neighbouring chunks to add on each side of a hit (maximum ${MAX_EXPAND})
-  --weight <name=x>   Weight of a ranking signal such as recency; repeatable
+  --weight <name=x>   Weight of the recency signal, as recency=x
   --models-dir <dir>  The model cache (default: <target-dir>/models/)
   --offline           Never download models; fail if they are not cached
 ${COMMON_HELP}

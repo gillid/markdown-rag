@@ -1,6 +1,5 @@
 ---
 title: "Team: Payments Platform"
-source: team
 updated_at: "2026-05-20"
 tags: [payments, team]
 ---

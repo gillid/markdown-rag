@@ -1,8 +1,6 @@
 ---
 title: "Error Reference"
-source: api
 updated_at: "2026-08-20"
-url: "https://docs.orbitside.dev/api/errors"
 tags: [api]
 ---
 

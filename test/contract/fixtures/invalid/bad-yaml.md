@@ -1,6 +1,5 @@
 ---
 title: "Bad YAML
-source: docs
 updated_at: "2026-01-15"
 ---
 

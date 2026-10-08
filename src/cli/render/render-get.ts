@@ -2,9 +2,6 @@ import type { Document } from "../../engine/index.ts";
 import { formatDate } from "./format.ts";
 
 function header(document: Document): string[] {
-  const signals = Object.entries(document.signals).map(
-    ([name, value]) => `${name}=${value}`,
-  );
   const meta = Object.entries(document.meta).map(
     ([key, value]) => `- meta.${key}: ${JSON.stringify(value)}`,
   );
@@ -12,13 +9,10 @@ function header(document: Document): string[] {
     `# ${document.title}`,
     "",
     `- ref: ${document.ref}`,
-    `- source: ${document.source}`,
     `- updated: ${formatDate(document.updated_at)}`,
-    ...(document.url === undefined ? [] : [`- url: ${document.url}`]),
     ...(document.tags.length === 0
       ? []
       : [`- tags: ${document.tags.join(", ")}`]),
-    ...(signals.length === 0 ? [] : [`- signals: ${signals.join(", ")}`]),
     ...meta,
   ];
 }

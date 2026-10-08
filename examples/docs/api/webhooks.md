@@ -1,8 +1,6 @@
 ---
 title: "Webhooks"
-source: api
 updated_at: "2026-03-28"
-url: "https://docs.orbitside.dev/api/webhooks"
 tags: [api]
 ---
 

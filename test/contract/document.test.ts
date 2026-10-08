@@ -3,26 +3,23 @@ import { z } from "zod";
 import { parseFrontmatterMetadata } from "../../src/contract/document.ts";
 
 describe("parseFrontmatterMetadata", () => {
-  it("accepts the required fields alone", () => {
+  it("accepts the required fields alone, with no tags", () => {
     const metadata = parseFrontmatterMetadata({
       title: "Minimal",
-      source: "docs",
       updated_at: "2026-01-15",
+      tags: [],
     });
     expect(metadata).toEqual({
       title: "Minimal",
-      source: "docs",
       updatedAt: new Date("2026-01-15").getTime(),
-      url: undefined,
       tags: [],
-      signals: {},
       meta: {},
     });
   });
 
   describe("updated_at", () => {
     const parse = (updated_at: unknown) =>
-      parseFrontmatterMetadata({ title: "T", source: "docs", updated_at });
+      parseFrontmatterMetadata({ title: "T", tags: [], updated_at });
 
     it.each([
       ["2026-01-15", 1768435200000],
@@ -57,83 +54,52 @@ describe("parseFrontmatterMetadata", () => {
     });
   });
 
-  it("reads every optional field and passes unknown keys through as meta", () => {
+  it("reads the tags and passes unknown keys through as meta", () => {
     const metadata = parseFrontmatterMetadata({
       title: "Full",
-      source: "docs",
       updated_at: "2026-02-20",
-      url: "https://example.com/full",
       tags: ["runbook", "payments"],
-      signals: { authority: 0.8, curated: 1 },
+      source: "docs",
+      url: "https://example.com/full",
       source_id: "ext-123",
     });
-    expect(metadata.url).toBe("https://example.com/full");
     expect(metadata.tags).toEqual(["runbook", "payments"]);
-    expect(metadata.signals).toEqual({ authority: 0.8, curated: 1 });
-    expect(metadata.meta).toEqual({ source_id: "ext-123" });
+    expect(metadata.meta).toEqual({
+      source: "docs",
+      url: "https://example.com/full",
+      source_id: "ext-123",
+    });
   });
 
   it("rejects a missing required field", () => {
     expect(() =>
-      parseFrontmatterMetadata({ source: "docs", updated_at: "2026-01-15" }),
+      parseFrontmatterMetadata({ updated_at: "2026-01-15", tags: [] }),
+    ).toThrow(z.ZodError);
+    expect(() => parseFrontmatterMetadata({ title: "T", tags: [] })).toThrow(
+      z.ZodError,
+    );
+    expect(() =>
+      parseFrontmatterMetadata({ title: "T", updated_at: "2026-01-15" }),
     ).toThrow(z.ZodError);
   });
 
-  it("rejects an empty required field", () => {
+  it("rejects an empty title", () => {
     expect(() =>
       parseFrontmatterMetadata({
         title: "",
-        source: "docs",
         updated_at: "2026-01-15",
+        tags: [],
       }),
     ).toThrow(z.ZodError);
   });
 
-  it("rejects a signal value above 1", () => {
+  it("rejects tags that are not a list of strings", () => {
     expect(() =>
       parseFrontmatterMetadata({
         title: "T",
-        source: "docs",
         updated_at: "2026-01-15",
-        signals: { authority: 1.5 },
+        tags: "runbook",
       }),
     ).toThrow(z.ZodError);
-  });
-
-  it("rejects a signal value below 0", () => {
-    expect(() =>
-      parseFrontmatterMetadata({
-        title: "T",
-        source: "docs",
-        updated_at: "2026-01-15",
-        signals: { authority: -0.1 },
-      }),
-    ).toThrow(z.ZodError);
-  });
-
-  it("rejects the reserved 'recency' signal name", () => {
-    expect(() =>
-      parseFrontmatterMetadata({
-        title: "T",
-        source: "docs",
-        updated_at: "2026-01-15",
-        signals: { recency: 0.5 },
-      }),
-    ).toThrow(z.ZodError);
-  });
-
-  it("rejects an upper-case signal name", () => {
-    expect(() =>
-      parseFrontmatterMetadata({
-        title: "T",
-        source: "docs",
-        updated_at: "2026-01-15",
-        signals: { Authority: 0.5 },
-      }),
-    ).toThrow(z.ZodError);
-  });
-
-  it("rejects frontmatter that isn't a mapping", () => {
-    expect(() => parseFrontmatterMetadata("just a string")).toThrow(z.ZodError);
   });
 });

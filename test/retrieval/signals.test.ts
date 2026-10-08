@@ -40,31 +40,19 @@ describe("blend", () => {
 });
 
 describe("validateWeights", () => {
-  const declared = new Set(["authority"]);
-
-  it("accepts recency, a declared signal, and a total of exactly 0.5", () => {
-    expect(() =>
-      validateWeights({ recency: 0.3, authority: 0.2 }, declared),
-    ).not.toThrow();
-  });
-
-  it("accepts weights whose floating-point sum is a rounding error above 0.5", () => {
-    expect(() =>
-      validateWeights(
-        { recency: 0.1, authority: 0.2, reviewed: 0.2 },
-        new Set(["authority", "reviewed"]),
-      ),
-    ).not.toThrow();
+  it("accepts recency up to exactly 0.5, and no weights at all", () => {
+    expect(() => validateWeights({ recency: 0.5 })).not.toThrow();
+    expect(() => validateWeights({})).not.toThrow();
   });
 
   it.each([
     [{ recency: -0.1 }, "[0, 1]"],
     [{ recency: 1.5 }, "[0, 1]"],
     [{ recency: Number.NaN }, "[0, 1]"],
-    [{ recency: 0.3, authority: 0.3 }, "at most 0.5"],
-    [{ reviewed: 0.1 }, "no document declares"],
+    [{ recency: 0.6 }, "at most 0.5"],
+    [{ authority: 0.1 }, 'the only signal is "recency"'],
   ])("rejects %j", (weights, message) => {
-    expect(() => validateWeights(weights, declared)).toThrow(message);
+    expect(() => validateWeights(weights)).toThrow(message);
   });
 });
 

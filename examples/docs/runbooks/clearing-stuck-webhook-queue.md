@@ -1,7 +1,7 @@
 ---
 title: "Clearing a Stuck Webhook Delivery Queue"
-source: runbook
 updated_at: "2026-05-30"
+tags: [runbook]
 ---
 
 # Clearing a Stuck Webhook Delivery Queue

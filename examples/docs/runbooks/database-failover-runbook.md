@@ -1,9 +1,7 @@
 ---
 title: "Database Failover Runbook"
-source: runbook
 updated_at: "2026-03-02"
-url: "https://runbooks.internal.orbitside.dev/database-failover"
-tags: [database, infra, on-call]
+tags: [database, infra, on-call, runbook]
 ---
 
 # Database Failover Runbook

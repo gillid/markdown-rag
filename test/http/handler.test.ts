@@ -80,7 +80,6 @@ describe("HTTP handler", () => {
       "ops/db.md",
       [
         "title: Database runbook",
-        "source: runbooks",
         'updated_at: "2026-01-15"',
         "tags: [ops, db]",
       ],
@@ -97,12 +96,7 @@ describe("HTTP handler", () => {
     await writeMarkdown(
       sourceDir,
       "chat/thread.md",
-      [
-        "title: Deploy thread",
-        "source: chat",
-        'updated_at: "2026-03-01"',
-        "tags: [chat]",
-      ],
+      ["title: Deploy thread", 'updated_at: "2026-03-01"', "tags: [chat]"],
       "Someone asked about the deploy freeze.",
     );
     const targetDir = join(scratch.workDir("kb"), "engine");
@@ -123,7 +117,7 @@ describe("HTTP handler", () => {
   describe("operations", () => {
     it("answers /overview with the counts within the filter", async () => {
       const all = await getJson(`${served.url}/overview`);
-      const runbooks = await getJson(`${served.url}/overview?source=runbooks`);
+      const runbooks = await getJson(`${served.url}/overview?tag=ops`);
 
       expect(all.status).toBe(200);
       expect(all.body.documents).toBe(2);
@@ -178,12 +172,11 @@ describe("HTTP handler", () => {
   describe("filters", () => {
     it("reads repeated parameters as the same filter as the JSON body", async () => {
       const viaParams = await getJson(
-        `${served.url}/documents?tag=ops&tag=db&source=runbooks&updated_after=1`,
+        `${served.url}/documents?tag=ops&tag=db&updated_after=1`,
       );
       const direct = await engine.listDocuments({
         filter: {
           tags: ["ops", "db"],
-          sources: ["runbooks"],
           updated_after: 1,
         },
       });
@@ -192,11 +185,11 @@ describe("HTTP handler", () => {
         JSON.stringify({
           query: "deploy freeze",
           mode: "keyword",
-          filter: { sources: ["chat"] },
+          filter: { tags: ["chat"] },
         }),
       );
       const viaParamsOverview = await getJson(
-        `${served.url}/overview?source=chat`,
+        `${served.url}/overview?tag=chat`,
       );
 
       expect(viaParams.body).toEqual(JSON.parse(JSON.stringify(direct)));

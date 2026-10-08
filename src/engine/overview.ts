@@ -3,7 +3,7 @@ import type { KnowledgeIndex } from "../index/knowledge-index.ts";
 import { compareStrings } from "./compare.ts";
 import type { OverviewOutput } from "./schemas/overview.ts";
 
-type Counted = OverviewOutput["sources"];
+type Counted = OverviewOutput["tags"];
 
 function countDocuments(names: Iterable<string>): Counted {
   const counts = new Map<string, number>();
@@ -26,13 +26,9 @@ export function overviewOf(
     embedding_model: index.model?.modelId ?? null,
     documents: matching.length,
     chunks: matching.reduce((sum, { chunks }) => sum + chunks.length, 0),
-    sources: countDocuments(matching.map(({ summary }) => summary.source)),
     // A tag listed twice in one document still counts that document once.
     tags: countDocuments(
       matching.flatMap(({ summary }) => [...new Set(summary.tags)]),
-    ),
-    signals: countDocuments(
-      matching.flatMap(({ summary }) => Object.keys(summary.signals)),
     ),
   };
 }

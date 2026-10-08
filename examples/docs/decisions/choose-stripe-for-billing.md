@@ -1,8 +1,7 @@
 ---
 title: "Decision: Use Stripe for Internal Subscription Billing"
-source: decision
 updated_at: "2024-12-01"
-tags: [billing]
+tags: [billing, decision]
 ---
 
 # Decision: Use Stripe for Internal Subscription Billing

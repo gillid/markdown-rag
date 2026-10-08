@@ -116,7 +116,7 @@ describe("searchCandidates", () => {
   it("never returns a non-finite score, even when a filter leaves a single chunk", async () => {
     for (const filter of [
       { dir: "teams" },
-      { sources: ["team"] },
+      { tags_any: ["team"] },
       { tags: ["billing"] },
       { tags: ["database", "infra", "disaster-recovery"] },
     ]) {
@@ -256,8 +256,8 @@ describe("searchCandidates", () => {
     // The expected documents are read off the fixture's frontmatter, not computed by the filter code.
     it.each<[string, Filter, (path: string) => boolean]>([
       [
-        "sources",
-        { sources: ["runbook", "slack"] },
+        "tags_any",
+        { tags_any: ["runbook", "slack"] },
         (path) => path.startsWith("runbooks/") || path.startsWith("slack/"),
       ],
       [
@@ -338,8 +338,8 @@ describe("searchCandidates when no chunk is similar to the query vector", () => 
         join(root, "kb", name as string),
         `---
 title: "${name}"
-source: docs
 updated_at: "2026-01-01"
+tags: []
 ---
 
 ${text}

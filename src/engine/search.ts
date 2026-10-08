@@ -23,7 +23,7 @@ export async function searchOf(
     weights: request.weights,
     expand: request.expand,
   }).catch((error: unknown) => {
-    // Values the schema can't judge, such as a weight for a signal no document declares, are still the caller's mistake.
+    // Values the schema can't judge, such as a weight for a signal other than recency, are still the caller's mistake.
     if (error instanceof RetrievalOptionError) {
       throw new InvalidRequestError(
         `Invalid search request:\n${error.message}`,

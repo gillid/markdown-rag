@@ -16,11 +16,8 @@ const summary = {
   ref: "ops/db.md",
   path: "ops/db.md",
   title: "Database runbook",
-  source: "runbooks",
   tags: ["ops", "db"],
   updated_at: JAN_15,
-  url: "https://example.test/db",
-  signals: { authority: 0.9 },
   meta: { owner: "data" },
 };
 
@@ -31,12 +28,10 @@ describe("renderOverview", () => {
       embedding_model: "bge-small-en-v1.5-q8",
       documents: 2,
       chunks: 5,
-      sources: [{ name: "runbooks", documents: 2 }],
       tags: [
         { name: "db", documents: 1 },
         { name: "ops", documents: 2 },
       ],
-      signals: [],
     };
 
     expect(renderOverview(overview)).toBe(`# Overview
@@ -46,18 +41,10 @@ describe("renderOverview", () => {
 - embedding model: bge-small-en-v1.5-q8
 - index_version: abc
 
-## Sources
-
-- runbooks (2)
-
 ## Tags
 
 - db (1)
 - ops (2)
-
-## Signals
-
-(none)
 `);
   });
 });
@@ -86,7 +73,7 @@ describe("renderSearch", () => {
   it("prints a heading, a facts line and the snippet for each result", () => {
     expect(renderSearch(response)).toBe(`## Database runbook › Failover
 
-source: runbooks · updated: 2026-01-15 · url: https://example.test/db · ref: ops/db.md#failover · score: 0.813
+updated: 2026-01-15 · ref: ops/db.md#failover · score: 0.813
 
 > Promote the replica.
 
@@ -134,31 +121,6 @@ index_version: abc
     );
   });
 
-  it("leaves the url out when the document has none", () => {
-    const { url: _url, ...withoutUrl } = response.results[0] ?? summary;
-    const text = renderSearch({
-      ...response,
-      results: [
-        {
-          ...withoutUrl,
-          breadcrumb: "B",
-          text: "T",
-          scores: response.results[0]?.scores ?? {
-            retrieval: 0,
-            rerank: null,
-            relevance: 0,
-            signals: {},
-            final: 0,
-          },
-        },
-      ],
-    });
-
-    expect(text).toContain(
-      "source: runbooks · updated: 2026-01-15 · ref: ops/db.md#failover · score: 0.813",
-    );
-  });
-
   it("says so explicitly when nothing is relevant", () => {
     expect(renderSearch({ ...response, results: [] })).toBe(
       "No relevant context found.\n\nindex_version: abc\n",
@@ -181,8 +143,8 @@ describe("renderList", () => {
   it("prints one line per document and the range shown", () => {
     expect(
       renderList(list),
-    ).toBe(`- ops/db.md · Database runbook · runbooks · 2026-01-15 · ops, db
-- ops/net.md · Network · runbooks · 2026-01-15
+    ).toBe(`- ops/db.md · Database runbook · 2026-01-15 · ops, db
+- ops/net.md · Network · 2026-01-15
 
 Showing 11–12 of 12 document(s).
 
@@ -212,11 +174,8 @@ describe("renderGet", () => {
     expect(renderGet(document)).toBe(`# Database runbook
 
 - ref: ops/db.md
-- source: runbooks
 - updated: 2026-01-15
-- url: https://example.test/db
 - tags: ops, db
-- signals: authority=0.9
 - meta.owner: "data"
 
 ## Outline
@@ -231,11 +190,10 @@ Promote the replica.
 `);
   });
 
-  it("leaves out the tags and signals lines when there are none", () => {
-    const text = renderGet({ ...document, tags: [], signals: {} });
+  it("leaves out the tags line when there are none", () => {
+    const text = renderGet({ ...document, tags: [] });
 
     expect(text).not.toContain("- tags:");
-    expect(text).not.toContain("- signals:");
   });
 
   it("renders an outline too large to spread into function arguments", () => {

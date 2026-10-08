@@ -1,8 +1,7 @@
 ---
 title: "Decision: Initial Public API Rate Limits"
-source: decision
 updated_at: "2023-02-10"
-tags: [api, rate-limiting]
+tags: [api, rate-limiting, decision]
 ---
 
 # Decision: Initial Public API Rate Limits

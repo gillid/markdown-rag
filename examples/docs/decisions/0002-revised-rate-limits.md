@@ -1,8 +1,7 @@
 ---
 title: "Decision: Tiered Public API Rate Limits"
-source: decision
 updated_at: "2026-08-01"
-tags: [api, rate-limiting]
+tags: [api, rate-limiting, decision]
 ---
 
 # Decision: Tiered Public API Rate Limits

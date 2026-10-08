@@ -1,8 +1,7 @@
 ---
 title: "Handling Rate-Limit Storm Incidents"
-source: runbook
 updated_at: "2025-11-05"
-tags: [api, incidents, on-call]
+tags: [api, incidents, on-call, runbook]
 ---
 
 # Handling Rate-Limit Storm Incidents

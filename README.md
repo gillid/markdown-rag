@@ -23,21 +23,20 @@ Every `.md` file starts with a little frontmatter:
 ```markdown
 ---
 title: "Rollback a Bad Deploy"
-source: runbook
 updated_at: "2026-07-15"
-tags: [process]
+tags: [runbook, process]
 ---
 
 Run `orbitctl deploy rollback --service=<name>` to revert to the previous release.
 ```
 
-`title`, `source` and `updated_at` are required. `url`, `tags` and `signals` are optional. `npx markdown-rag check --source-dir ./docs` validates the files and tells you what to fix.
+`title`, `updated_at` and `tags` are required (`tags` may be an empty list). Any other key is kept as pass-through metadata. `npx markdown-rag check --source-dir ./docs` validates the files and tells you what to fix.
 
 ## Four operations
 
 | Operation | Use it to |
 | --- | --- |
-| `overview` | Learn which sources and tags exist, before filtering |
+| `overview` | Learn which tags exist, before filtering |
 | `search` | Answer a question with ranked, cited snippets |
 | `list` | Enumerate documents or find what changed recently |
 | `get` | Read a whole document or one section, by the `ref` that `search` and `list` print |

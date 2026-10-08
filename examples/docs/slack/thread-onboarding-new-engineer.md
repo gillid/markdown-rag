@@ -1,9 +1,8 @@
 ---
 title: "Slack thread: onboarding checklist questions"
-source: slack
 updated_at: "2026-05-14"
 channel: "#eng-onboarding"
-tags: [process]
+tags: [process, slack]
 ---
 
 # Slack thread: onboarding checklist questions

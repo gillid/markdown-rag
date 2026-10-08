@@ -1,8 +1,7 @@
 ---
 title: "Primary On-Call Acknowledgement Window"
-source: runbook
 updated_at: "2022-08-01"
-tags: [on-call, process]
+tags: [on-call, process, runbook]
 ---
 
 # Primary On-Call Acknowledgement Window
