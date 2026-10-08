@@ -1,19 +1,40 @@
 {
-  "name": "md-rag",
+  "name": "markdown-rag",
   "version": "0.1.0",
   "description": "Serves a Git repository of Markdown files to AI agents via in-process hybrid search.",
   "license": "MIT",
   "type": "module",
-  "private": true,
   "packageManager": "pnpm@10.18.3",
+  "bin": {
+    "md-rag": "./src/cli/main.ts"
+  },
   "exports": {
     ".": "./src/engine/index.ts"
+  },
+  "files": [
+    "dist/",
+    "LICENSE",
+    "README.md"
+  ],
+  "publishConfig": {
+    "bin": {
+      "md-rag": "./dist/cli/main.js"
+    },
+    "exports": {
+      ".": {
+        "types": "./dist/engine/index.d.ts",
+        "default": "./dist/engine/index.js"
+      }
+    }
   },
   "engines": {
     "node": ">=24"
   },
   "scripts": {
     "prepare": "lefthook install",
+    "build": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\" && tsc -p tsconfig.build.json",
+    "prepack": "pnpm build",
+    "test:pack": "node scripts/pack-smoke.ts",
     "md-rag": "node src/cli/main.ts",
     "start": "node src/cli/main.ts serve",
     "lint": "biome check .",

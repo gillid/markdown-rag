@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { z } from "zod";
 
-// Read, not imported: a JSON import from outside `src/` would break the pack-time emit planned in step 19.2, and `dist/engine/` will sit as deep as `src/engine/`.
+// Read, not imported: a JSON import from outside `src/` would break the pack-time emit, and `dist/engine/` sits as deep as `src/engine/`, so `../../package.json` resolves in both.
 const manifest = z
   .object({ version: z.string() })
   .parse(
