@@ -6,7 +6,7 @@ An open-source engine that serves a Git repository of Markdown files to AI agent
 
 - **Runtime:** Node.js 24 LTS, ESM. TypeScript runs directly through native type stripping (no build step in development), with `tsc --noEmit` for type-checking only. Use erasable syntax only: no `enum`, no `namespace`, no parameter properties. Sidecar vectors use Node 24's native `DataView` float16 methods (ADR-033), so the `tsconfig.json` `lib` includes `ESNext.Float16`.
 - **Package manager:** pnpm
-- **Distribution:** one npm package, `markdown-rag`, whose binary is `md-rag`. `tsc` emits JS and `.d.ts` into `dist/` only at pack time (`prepack`, ADR-030); `publishConfig` points `bin` and `exports` at `dist/`, while in the repo they point at the `.ts` sources. Pushing a `v<version>` tag publishes through `.github/workflows/publish.yml` (npm trusted publishing, ADR-043).
+- **Distribution:** one npm package, `markdown-rag`, whose binary is `md-rag`. `tsc` emits JS and `.d.ts` into `dist/` only at pack time (`prepack`, ADR-030); `publishConfig` points `bin` and `exports` at `dist/`, while in the repo they point at the `.ts` sources. Merging to `main` a `package.json` whose `version` isn't on npm yet publishes it and tags `v<version>` through `.github/workflows/publish.yml` (npm trusted publishing, ADR-043).
 - **Search:** `@orama/orama` (in-process hybrid index) with `@orama/stopwords` for the English BM25 stopword list
 - **Query-path models (local):** `@huggingface/transformers` on `onnxruntime-node`. The embedder is `Xenova/bge-small-en-v1.5` and the reranker is `Xenova/ms-marco-MiniLM-L-6-v2` (q8).
 - **Parsing and validation:** `mdast-util-from-markdown`, `mdast-util-frontmatter`, `mdast-util-gfm-table` (tables are parsed as tables), `mdast-util-to-string`, `yaml`, `zod`
@@ -39,6 +39,7 @@ Before reporting work as done, run `pnpm lint:fix`, `pnpm typecheck` and `pnpm t
 - **One step, one PR.** Work follows `docs/implementation.md`. Set the step's status (`planned` → `in-progress` → `done`) in the same PR.
 - **Sidecars are the contract between the write path and the read path.** A sidecar is fresh if and only if its `doc_hash` matches its document, its chunker ID and embedding model match the ones all sidecars share, its vectors decode, and its chunks match the document text (ADR-006, ADR-039). Sidecar output must be byte-stable. Stale sidecars must fail fast and must never be patched over at runtime.
 - **Engine-owned files live only in `targetDir`** (default `<sourceDir>/.md-rag/`: sidecars and model cache). Every file in it is generated; never add a hand-edited one, and never write anywhere else in a knowledge base (ADR-031, ADR-037).
+- **A release is a `version` bump merged to `main`.** Never push a tag by hand and never bump `version` unless the PR is meant to ship (ADR-043).
 - **Sidecars are never committed.** The whole engine folder is git-ignored, and `md-rag embed` regenerates it before serving; tests generate sidecars into a temporary `targetDir` (ADR-038).
 - **No environment variables.** Configuration arrives only through CLI flags or the object passed to `createEngine`; there is no config file. The embedding model comes from the sidecars (ADR-032).
 - **Neither path makes network calls.** The only network access is downloading model weights into the cache.
@@ -59,7 +60,7 @@ Before reporting work as done, run `pnpm lint:fix`, `pnpm typecheck` and `pnpm t
 | Sample knowledge base and golden queries | `examples/docs/`, `examples/eval/` (planned, steps 3, 21) |
 | CLI entry and subcommands | `src/cli/` |
 | Pack-time emit config and the packed-tarball smoke test | `tsconfig.build.json`, `scripts/pack-smoke.ts` |
-| Release workflow (tag push publishes to npm) | `.github/workflows/publish.yml` |
+| Release workflow (a new `version` merged to `main` publishes to npm and tags it) | `.github/workflows/publish.yml` |
 | Runtime config | `src/config/` |
 | Storage loading and contract validation | `src/contract/` |
 | Sidecar format, freshness, `md-rag embed` | `src/sidecars/` |

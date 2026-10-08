@@ -23,7 +23,9 @@ Follow these steps in order.
 
 6. **Commit any doc or code changes** from steps 3–5 that aren't already committed, following `CLAUDE.md`'s commit conventions (conventional commit subject with scope, split into logical commits, `Co-Authored-By` trailer) — only if the user hasn't asked you to hold off on committing.
 
-7. **Push and open a PR.**
+7. **Ask whether this PR is a release.** Merging to `main` publishes to npm and tags `v<version>` whenever `package.json`'s `version` isn't on npm yet (`.github/workflows/publish.yml`, ADR-043). So a bump of `version` in a PR is a release, and a PR that leaves it alone releases nothing. If the step changes what the published package does for consumers, ask the user whether to bump `version` in this PR (semver; `0.x` while the contract is unstable) and make it a separate `chore(release): <version>` commit. Never bump it without asking, and never create or push a tag by hand.
+
+8. **Push and open a PR.**
    - Push the current branch to the remote (`git push -u origin <branch>`).
    - Open a PR with `gh pr create`, using the sections from `.github/PULL_REQUEST_TEMPLATE.md` (Scope, Implementation, Key decisions). Title it after the step, e.g. `feat(storage-loader): add storage loader and document contract (step 5)`.
    - Report the PR URL back to the user.
