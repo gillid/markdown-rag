@@ -48,12 +48,13 @@ jobs:
       contents: read
       id-token: write
     env:
-      TARBALL: ${{ runner.temp }}/${{ needs.check.outputs.name }}-${{ needs.check.outputs.version }}.tgz
+      NAME: ${{ needs.check.outputs.name }}
       VERSION: ${{ needs.check.outputs.version }}
     steps:
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
+      - run: echo "TARBALL=$RUNNER_TEMP/$NAME-$VERSION.tgz" >> "$GITHUB_ENV"
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v6
         with:
