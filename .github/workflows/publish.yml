@@ -9,62 +9,61 @@ concurrency:
   cancel-in-progress: false
 
 permissions:
-  contents: write
-  id-token: write
+  contents: read
 
 jobs:
-  publish:
+  check:
     runs-on: ubuntu-latest
+    outputs:
+      name: ${{ steps.version.outputs.name }}
+      version: ${{ steps.version.outputs.version }}
+      unpublished: ${{ steps.version.outputs.unpublished }}
     steps:
       - uses: actions/checkout@v7
-      - name: Look for an unpublished version
-        id: release
+      - id: version
         run: |
           name=$(node -p "require('./package.json').name")
           version=$(node -p "require('./package.json').version")
           if npm view "$name@$version" version > /dev/null 2>&1; then
             echo "$name@$version is already on npm, nothing to release"
-            echo "needed=false" >> "$GITHUB_OUTPUT"
+            echo "unpublished=false" >> "$GITHUB_OUTPUT"
           else
-            echo "needed=true" >> "$GITHUB_OUTPUT"
+            echo "unpublished=true" >> "$GITHUB_OUTPUT"
           fi
+          echo "name=$name" >> "$GITHUB_OUTPUT"
           echo "version=$version" >> "$GITHUB_OUTPUT"
-          echo "tarball=$RUNNER_TEMP/$name-$version.tgz" >> "$GITHUB_OUTPUT"
-      - if: steps.release.outputs.needed == 'true'
-        uses: pnpm/action-setup@v6
-      - if: steps.release.outputs.needed == 'true'
-        uses: actions/setup-node@v6
+
+  publish:
+    needs: check
+    if: needs.check.outputs.unpublished == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+    env:
+      TARBALL: ${{ runner.temp }}/${{ needs.check.outputs.name }}-${{ needs.check.outputs.version }}.tgz
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
         with:
           node-version: 24
           cache: pnpm
           registry-url: https://registry.npmjs.org
-      - if: steps.release.outputs.needed == 'true'
-        run: pnpm install --frozen-lockfile
-      - if: steps.release.outputs.needed == 'true'
-        run: pnpm lint
-      - if: steps.release.outputs.needed == 'true'
-        run: pnpm typecheck
-      - if: steps.release.outputs.needed == 'true'
-        run: pnpm test
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm test
       # pnpm pack applies publishConfig; npm publish then ships that same tarball as-is, with OIDC provenance.
-      - if: steps.release.outputs.needed == 'true'
-        run: pnpm pack --pack-destination "$RUNNER_TEMP"
-      - if: steps.release.outputs.needed == 'true'
-        run: pnpm test:pack "${{ steps.release.outputs.tarball }}"
+      - run: pnpm pack --pack-destination "$RUNNER_TEMP"
+      - run: pnpm test:pack "$TARBALL"
       - name: Publish (prereleases go to the next tag, never latest)
-        if: steps.release.outputs.needed == 'true'
         run: |
-          case "${{ steps.release.outputs.version }}" in *-*) dist_tag=next ;; *) dist_tag=latest ;; esac
-          npm publish "${{ steps.release.outputs.tarball }}" --provenance --access public --tag "$dist_tag"
-      # Runs on every push, so a release whose tag push failed is tagged by the next run.
+          case "${{ needs.check.outputs.version }}" in *-*) dist_tag=next ;; *) dist_tag=latest ;; esac
+          npm publish "$TARBALL" --provenance --access public --tag "$dist_tag"
       - name: Tag the release
         run: |
-          tag="v${{ steps.release.outputs.version }}"
-          if git ls-remote --exit-code --tags origin "refs/tags/$tag" > /dev/null; then
-            echo "$tag already exists"
-            exit 0
-          fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git tag "$tag"
-          git push origin "$tag"
+          git tag "v${{ needs.check.outputs.version }}"
+          git push origin "v${{ needs.check.outputs.version }}"
