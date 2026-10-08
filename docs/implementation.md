@@ -196,18 +196,24 @@ Status: `planned` · `in-progress` · `done`
 - Behaviour does not change.
 - **Tests:** per command, `--help` wins over a bad flag value and over a repeated flag; the existing command tests pass unchanged. A command's options table that defines its own `help` is rejected at compile time (`FlagOptions` forbids the key), and so is a query command that redeclares a common flag (`source-dir`, `target-dir`, `json`).
 
-### 19.2 Package distribution · `planned`
+### 19.2 Package distribution · `done`
 
-- Ship everything as one npm package, `md-rag` (ADR-029). The `name` is already `md-rag`; remove `private`, add a `files` allowlist (`dist/`, `LICENSE`, `README.md`) and make sure runtime libraries are in `dependencies`.
+- Ship everything as one npm package, `markdown-rag` (ADR-029), with the `md-rag` binary. Set `name` to `markdown-rag`; remove `private`, add a `files` allowlist (`dist/`, `LICENSE`, `README.md`) and make sure runtime libraries are in `dependencies`.
 - `bin` maps `md-rag` to the CLI entry, which gets a `#!/usr/bin/env node` shebang. `exports` exposes the library entry from step 17 along with its types. Inside the repo both point at the `.ts` sources; pnpm's `publishConfig` points them at `dist/` for the published package.
 - `pnpm build` runs `tsc -p tsconfig.build.json`, which emits JS and `.d.ts` files into `dist/`. It extends `tsconfig.json`, turns off `noEmit` and `allowImportingTsExtensions`, and sets `declaration`, `rewriteRelativeImportExtensions` and an explicit `rootDir: "src"`, which TypeScript 7 requires for emit. It runs only from `prepack` (ADR-030). Add `dist/` to `.gitignore`.
 - In `CLAUDE.md`, add `pnpm build` to the commands table and note the pack-time emit in the tech stack.
-- Publishing is a manual `pnpm publish` by the maintainer. This step makes the package publishable; it doesn't automate releases.
+- Publishing is automated: pushing a `v<version>` tag runs `.github/workflows/publish.yml`, which checks the tag against `package.json`, reruns lint, typecheck, the tests and the pack check, packs with `pnpm pack` (so `publishConfig` applies) and publishes that tarball with `npm publish --provenance` through npm trusted publishing (OIDC), so there is no stored token. One-time setup by the maintainer: register the repository and `publish.yml` as a trusted publisher for `markdown-rag` on npmjs.com. To release: bump `version`, merge, then `git tag v<version>` and push the tag.
 - **Tests:** a CI job runs `pnpm pack`, installs the tarball into an empty temporary directory and checks three things: `md-rag --help` runs, `md-rag check` on a copy of `examples/docs` reports no contract errors and fails only with the "run `md-rag embed` first" error, and a small TypeScript consumer that imports `createEngine` from `md-rag` type-checks. None of these download a model.
+
+### 19.3 Slimmer frontmatter contract · `planned`
+
+- Reduce the frontmatter to what every document needs: `title`, `updated_at` and `tags`. Drop `source`, `url` and `signals` as fields; whatever they carried (where a document came from, a link back, a ranking hint) goes into `tags`.
+- To decide before starting, since each touches an ADR in `docs/design.md` §4 (supersede it in the same PR): what replaces the `--source` filter and the sources list in `overview` (a tag convention such as `source:runbook`); what becomes of ranking signals and the `--weight` option (ADR-034), which leaves recency as the only signal; how a result links back to its origin without `url`.
+- Update the sidecar format, `docs/contract.md` once it exists, `examples/docs`, the golden queries, the README and every test that uses these fields. Existing sidecars become stale and must fail fast, as for any contract change.
 
 ### 20. Agent setup doc · `planned`
 
-- `docs/agent-setup.md` gives ready-to-paste instructions (a `CLAUDE.md` snippet or skill) that teach an agent when and how to call the four operations through the CLI (`md-rag overview`, `search`, `list` and `get`, or `npx md-rag …` when it isn't installed) or HTTP. Every consumer of the package has the same interface, so the snippet doesn't need adapting per team (ADR-029). The style follows Grapevine's tool descriptions:
+- `docs/agent-setup.md` gives ready-to-paste instructions (a `CLAUDE.md` snippet or skill) that teach an agent when and how to call the four operations through the CLI (`md-rag overview`, `search`, `list` and `get`, or `npx markdown-rag …` when it isn't installed) or HTTP. Every consumer of the package has the same interface, so the snippet doesn't need adapting per team (ADR-029). The style follows Grapevine's tool descriptions:
   - the orient, narrow and read loop: `overview` to learn the real sources and tags, the same filter on `search` or `list`, then `get` (with `--no-body` to see the outline first) (ADR-035)
   - when to use `list` rather than `search`: enumerating or finding what changed recently, not answering a question
   - when to use `keyword` mode (identifiers, error codes) and when to use `hybrid` or `semantic`
@@ -258,6 +264,6 @@ Status: `planned` · `in-progress` · `done`
 
 ### 24. Integrator documentation · `planned`
 
-- `README.md` covers: what the project is, a no-install quick start (`npx md-rag embed`, `check`, `search` and `serve` against a local directory), installing it (`pnpm add md-rag`) for the library API, and the configuration reference (the CLI flags and the matching `createEngine` options, ADR-032).
+- `README.md` covers: what the project is, a no-install quick start (`npx markdown-rag embed`, `check`, `search` and `serve` against a local directory), installing it (`pnpm add markdown-rag`) for the library API, and the configuration reference (the CLI flags and the matching `createEngine` options, ADR-032).
 - The configuration reference also covers the model cache: a custom `--models-dir` is git-ignored by the engine only when it has no `.gitignore` of its own, a corrupted cache is fixed by deleting `modelsDir`, transformers.js reads `HF_TOKEN` and `HF_ACCESS_TOKEN` from the environment when it downloads, so a stale token can fail the download of the public model, and it looks in `/models/<repository>` before the cache, so a directory mounted there would shadow the pinned weights.
 - `docs/contract.md` is the full frontmatter contract (including `signals`, ADR-034), the engine folder's layout and the sidecar format, and how to run `md-rag embed` in a deployment pipeline with a cached engine folder (ADR-038), written for exporter authors and integrators. It spells out the exporter's obligations under A4: byte-identical output for unchanged content (no export timestamps in files), `updated_at` taken from the source's change time, and tags as the filterable vocabulary (ADR-035).
