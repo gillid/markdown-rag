@@ -1,8 +1,6 @@
 ---
 title: "API Changelog"
-source: api
 updated_at: "2026-08-25"
-url: "https://docs.orbitside.dev/api/changelog"
 tags: [api]
 ---
 

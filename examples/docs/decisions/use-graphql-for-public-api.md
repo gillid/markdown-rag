@@ -1,8 +1,7 @@
 ---
 title: "Decision: Add a GraphQL Endpoint Alongside REST"
-source: decision
 updated_at: "2025-09-15"
-tags: [api]
+tags: [api, decision]
 ---
 
 # Decision: Add a GraphQL Endpoint Alongside REST

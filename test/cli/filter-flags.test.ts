@@ -11,14 +11,12 @@ describe("filterFromFlags", () => {
   it("maps each flag onto its filter field", () => {
     expect(
       filterFromFlags({
-        source: ["docs", "chat"],
         tag: ["a", "b"],
         "tag-any": ["c"],
         dir: "ops/db",
         since: "2026-01-05",
       }),
     ).toEqual({
-      sources: ["docs", "chat"],
       tags: ["a", "b"],
       tags_any: ["c"],
       dir: "ops/db",

@@ -46,7 +46,6 @@ describe("query commands", () => {
       "ops/db.md",
       [
         "title: Database runbook",
-        "source: runbooks",
         'updated_at: "2026-01-15"',
         "tags: [ops, db]",
       ],
@@ -63,12 +62,7 @@ describe("query commands", () => {
     await writeMarkdown(
       sourceDir,
       "chat/thread.md",
-      [
-        "title: Deploy thread",
-        "source: chat",
-        'updated_at: "2026-03-01"',
-        "tags: [chat]",
-      ],
+      ["title: Deploy thread", 'updated_at: "2026-03-01"', "tags: [chat]"],
       "Someone asked about the deploy freeze.",
     );
     const targetDir = join(scratch.workDir("kb"), "engine");
@@ -82,15 +76,11 @@ describe("query commands", () => {
 
       expect(result.exitCode).toBe(0);
       expect(result.stdout).toContain("- documents: 2\n");
-      expect(result.stdout).toContain("- runbooks (1)\n");
       expect(result.stdout).toContain("- db (1)\n");
     });
 
     it("counts within the filter", async () => {
-      const result = await runOverview(
-        [...flags, "--source", "chat"],
-        fakeDeps(),
-      );
+      const result = await runOverview([...flags, "--tag", "chat"], fakeDeps());
 
       expect(result.stdout).toContain("- documents: 1\n");
     });
@@ -100,9 +90,10 @@ describe("query commands", () => {
 
       expect(JSON.parse(result.stdout)).toMatchObject({
         documents: 2,
-        sources: [
+        tags: [
           { name: "chat", documents: 1 },
-          { name: "runbooks", documents: 1 },
+          { name: "db", documents: 1 },
+          { name: "ops", documents: 1 },
         ],
       });
     });
@@ -120,7 +111,7 @@ describe("query commands", () => {
       const result = await runList(flags, fakeDeps());
 
       expect(result.stdout).toMatch(
-        /^- chat\/thread\.md · Deploy thread · chat · 2026-03-01 · chat\n- ops\/db\.md · Database runbook · runbooks · 2026-01-15 · ops, db\n\nShowing 1–2 of 2 document\(s\)\./,
+        /^- chat\/thread\.md · Deploy thread · 2026-03-01 · chat\n- ops\/db\.md · Database runbook · 2026-01-15 · ops, db\n\nShowing 1–2 of 2 document\(s\)\./,
       );
     });
 
@@ -224,7 +215,7 @@ describe("query commands", () => {
 
     it("says so when the filter leaves nothing relevant", async () => {
       const result = await runSearch(
-        ["replica", "--mode", "keyword", "--source", "chat", ...flags],
+        ["replica", "--mode", "keyword", "--tag", "chat", ...flags],
         fakeDeps(),
       );
 
@@ -287,7 +278,7 @@ describe("query commands", () => {
       expect(started).toEqual([]);
     });
 
-    it("turns a weight for an undeclared signal into an error naming it", async () => {
+    it("turns a weight for an unknown signal into an error naming it", async () => {
       const result = await runSearch(
         ["replica", "--weight", "nosuch=0.1", ...flags],
         fakeDeps(),
@@ -369,7 +360,7 @@ describe("query commands", () => {
 
   it("accepts repeated list flags", async () => {
     const result = await runList(
-      [...flags, "--source", "chat", "--source", "runbooks"],
+      [...flags, "--tag-any", "chat", "--tag-any", "ops"],
       fakeDeps(),
     );
 

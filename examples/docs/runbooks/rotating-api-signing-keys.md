@@ -1,8 +1,7 @@
 ---
 title: "Rotating API Signing Keys"
-source: runbook
 updated_at: "2026-01-20"
-tags: [security, api, on-call]
+tags: [security, api, on-call, runbook]
 ---
 
 # Rotating API Signing Keys

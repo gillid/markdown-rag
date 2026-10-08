@@ -27,7 +27,7 @@ import {
 export const LIST_HELP = `Usage: md-rag list --source-dir <dir> [options]
 
 Lists the documents that match the filter, unranked: one line per document
-with its ref, title, source, updated date and tags. Use it to enumerate or to
+with its ref, title, updated date and tags. Use it to enumerate or to
 find what changed recently; use \`search\` to answer a question.
 
 Options:

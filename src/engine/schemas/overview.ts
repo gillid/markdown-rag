@@ -11,9 +11,7 @@ export const overviewSchema = z.strictObject({
   embedding_model: z.string().nullable(),
   documents: z.number(),
   chunks: z.number(),
-  sources: z.array(countedNameSchema),
   tags: z.array(countedNameSchema),
-  signals: z.array(countedNameSchema),
 });
 
 export type OverviewOutput = z.infer<typeof overviewSchema>;

@@ -1,8 +1,6 @@
 ---
 title: "Rate Limits"
-source: api
 updated_at: "2026-08-05"
-url: "https://docs.orbitside.dev/api/rate-limits"
 tags: [api, rate-limiting]
 ---
 

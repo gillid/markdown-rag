@@ -8,7 +8,7 @@ import {
 } from "./layout.ts";
 import { isSameOrAncestor, isStrictlyInside } from "./paths.ts";
 
-// Only the shape is checked here; ranges and signal names are checked against the index when the engine starts (ADR-013, ADR-034).
+// Only the shape is checked here; ranges and signal names are checked when the engine starts (ADR-013, ADR-034).
 const retrievalSchema = z
   .strictObject({
     mode: z.enum(SEARCH_MODES),

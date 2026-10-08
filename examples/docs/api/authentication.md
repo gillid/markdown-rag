@@ -1,8 +1,6 @@
 ---
 title: "API Authentication"
-source: api
 updated_at: "2026-04-02"
-url: "https://docs.orbitside.dev/api/authentication"
 tags: [api, security]
 ---
 

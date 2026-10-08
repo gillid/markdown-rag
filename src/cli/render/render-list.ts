@@ -6,7 +6,7 @@ export function renderList(list: DocumentList): string {
   const lines = list.documents.map((document) => {
     const tags =
       document.tags.length === 0 ? "" : ` · ${document.tags.join(", ")}`;
-    return `- ${document.ref} · ${document.title} · ${document.source} · ${formatDate(document.updated_at)}${tags}`;
+    return `- ${document.ref} · ${document.title} · ${formatDate(document.updated_at)}${tags}`;
   });
   const shown =
     list.documents.length === 0

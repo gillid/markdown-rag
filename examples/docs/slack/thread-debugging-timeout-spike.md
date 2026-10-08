@@ -1,9 +1,8 @@
 ---
 title: "Slack thread: gateway 504 spike this morning"
-source: slack
 updated_at: "2026-06-11"
 channel: "#incident-pay-1042"
-tags: [payments, incidents]
+tags: [payments, incidents, slack]
 ---
 
 # Slack thread: gateway 504 spike this morning

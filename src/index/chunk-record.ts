@@ -21,11 +21,9 @@ export function toChunkRecord(
     title: summary.title,
     breadcrumb: chunk.breadcrumb,
     text: chunk.text,
-    source: summary.source,
     tags: summary.tags,
     dirs: ancestorDirs(summary.path),
     updated_at: summary.updatedAt,
-    ...(summary.url !== undefined && { url: summary.url }),
     anchor: chunk.anchor,
     embedding: Array.from(vector),
   };

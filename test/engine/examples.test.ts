@@ -44,25 +44,16 @@ describe("engine over examples/docs", () => {
 
     expect(overview.documents).toBe(30);
     expect(overview.embedding_model).toBe("bge-small-en-v1.5-q8");
-    expect(overview.sources).toEqual([
-      { name: "api", documents: 7 },
-      { name: "decision", documents: 6 },
-      { name: "runbook", documents: 9 },
-      { name: "slack", documents: 7 },
-      { name: "team", documents: 1 },
-    ]);
     expect(overview.tags.find((tag) => tag.name === "api")).toEqual({
       name: "api",
       documents: 15,
     });
-    expect(overview.signals).toEqual([]);
   });
 
   it("counts only what matches the filter", async () => {
-    const overview = await engine.overview({ sources: ["runbook"] });
+    const overview = await engine.overview({ tags: ["runbook"] });
 
     expect(overview.documents).toBe(9);
-    expect(overview.sources).toEqual([{ name: "runbook", documents: 9 }]);
     expect(overview.tags).toEqual([
       { name: "api", documents: 2 },
       { name: "database", documents: 2 },
@@ -72,6 +63,7 @@ describe("engine over examples/docs", () => {
       { name: "on-call", documents: 6 },
       { name: "payments", documents: 1 },
       { name: "process", documents: 3 },
+      { name: "runbook", documents: 9 },
       { name: "security", documents: 1 },
     ]);
   });
@@ -80,17 +72,17 @@ describe("engine over examples/docs", () => {
     const { results } = await engine.search({
       query: "rotate signing keys",
       limit: 10,
-      filter: { sources: ["slack"] },
+      filter: { tags: ["slack"] },
     });
 
     expect(results.length).toBeGreaterThan(0);
-    expect(new Set(results.map((r) => r.source))).toEqual(new Set(["slack"]));
+    expect(results.every((r) => r.tags.includes("slack"))).toBe(true);
   });
 
   it("lists documents by path, with paging", async () => {
     const list = documentListSchema.parse(
       await engine.listDocuments({
-        filter: { sources: ["runbook"] },
+        filter: { tags: ["runbook"] },
         offset: 2,
         limit: 2,
       }),
@@ -116,9 +108,9 @@ describe("engine over examples/docs", () => {
     ]);
   });
 
-  it("lists newest first across a source", async () => {
+  it("lists newest first across a tag", async () => {
     const list = await engine.listDocuments({
-      filter: { sources: ["decision"] },
+      filter: { tags: ["decision"] },
       sort: "updated_at",
     });
 
@@ -144,8 +136,7 @@ describe("engine over examples/docs", () => {
     expect(document.ref).toBe(ref);
     expect(document).toMatchObject({
       title: "Rotating API Signing Keys",
-      source: "runbook",
-      tags: ["security", "api", "on-call"],
+      tags: ["security", "api", "on-call", "runbook"],
       updated_at: Date.parse("2026-01-20T00:00:00Z"),
     });
     expect(document.outline.map((heading) => heading.text)).toEqual([
@@ -202,9 +193,9 @@ describe("engine over examples/docs", () => {
     ],
     ["an empty tag", { query: "keys", filter: { tags: [""] } }],
     ["a non-array tag list", { query: "keys", filter: { tags_any: "api" } }],
-    // The schema accepts these; the retriever judges them against the signals the documents declare.
+    // The schema accepts these; the retriever judges them.
     [
-      "a weight for an undeclared signal",
+      "a weight for an unknown signal",
       { query: "keys", weights: { nonexistent: 0.1 } },
     ],
     ["weights above the cap", { query: "keys", weights: { recency: 0.6 } }],
@@ -223,9 +214,9 @@ describe("engine over examples/docs", () => {
     await expect(
       engine.listDocuments({ sort: "title" } as never),
     ).rejects.toThrow(InvalidRequestError);
-    await expect(engine.overview({ source: ["api"] } as never)).rejects.toThrow(
-      InvalidRequestError,
-    );
+    await expect(
+      engine.overview({ sources: ["api"] } as never),
+    ).rejects.toThrow(InvalidRequestError);
   });
 
   it.each([
@@ -254,7 +245,7 @@ describe("engine over examples/docs", () => {
       if (heading) heading.text = "injected";
     }).toThrow(TypeError);
     const again = await engine.getDocument(ref);
-    expect(again.tags).toEqual(["security", "api", "on-call"]);
+    expect(again.tags).toEqual(["security", "api", "on-call", "runbook"]);
     expect(again.outline[0]?.text).toBe("Rotating API Signing Keys");
   });
 

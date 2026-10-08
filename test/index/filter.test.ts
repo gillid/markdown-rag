@@ -13,7 +13,7 @@ describe("filter", () => {
 
   async function writeDoc(
     path: string,
-    frontmatter: { source: string; tags: string[]; updated: string },
+    frontmatter: { tags: string[]; updated: string },
   ) {
     const file = join(root, "kb", path);
     await mkdir(dirname(file), { recursive: true });
@@ -22,7 +22,6 @@ describe("filter", () => {
       [
         "---",
         `title: "${path}"`,
-        `source: ${frontmatter.source}`,
         `tags: [${frontmatter.tags.join(", ")}]`,
         `updated_at: "${frontmatter.updated}"`,
         "---",
@@ -37,22 +36,18 @@ describe("filter", () => {
   beforeAll(async () => {
     root = await mkdtemp(join(tmpdir(), "md-rag-filter-"));
     await writeDoc("a.md", {
-      source: "docs",
       tags: ["x"],
       updated: "2026-01-01",
     });
     await writeDoc("ops/b.md", {
-      source: "docs",
       tags: ["x", "y"],
       updated: "2026-02-01",
     });
     await writeDoc("ops/db/c.md", {
-      source: "chat",
       tags: ["y"],
       updated: "2026-03-01",
     });
     await writeDoc("opsy/d.md", {
-      source: "chat",
       tags: [],
       updated: "2026-04-01",
     });
@@ -83,10 +78,9 @@ describe("filter", () => {
     ["no constraint", {}, ["a.md", "ops/b.md", "ops/db/c.md", "opsy/d.md"]],
     [
       "empty lists",
-      { sources: [], tags: [], tags_any: [] },
+      { tags: [], tags_any: [] },
       ["a.md", "ops/b.md", "ops/db/c.md", "opsy/d.md"],
     ],
-    ["any of the sources", { sources: ["chat"] }, ["ops/db/c.md", "opsy/d.md"]],
     ["all of the tags", { tags: ["x", "y"] }, ["ops/b.md"]],
     [
       "any of the tags",
@@ -128,7 +122,6 @@ describe("filter", () => {
     [
       "every field together",
       {
-        sources: ["docs"],
         tags: ["x"],
         tags_any: ["y"],
         dir: "ops",

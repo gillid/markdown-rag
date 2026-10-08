@@ -31,8 +31,8 @@ export const overlapReranker: Reranker = {
 
 export const frontmatter = (extra: string[] = []) => [
   "title: Guide",
-  "source: docs",
   'updated_at: "2026-01-15"',
+  ...(extra.some((line) => line.startsWith("tags:")) ? [] : ["tags: []"]),
   ...extra,
 ];
 

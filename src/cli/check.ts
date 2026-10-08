@@ -15,8 +15,8 @@ import type { CliResult } from "./result.ts";
 
 export const CHECK_HELP = `Usage: md-rag check --source-dir <dir> [options]
 
-Validates the knowledge base contract (required frontmatter, valid signals
-and the 1 MB size limit) and sidecar freshness (every document has a sidecar
+Validates the knowledge base contract (required frontmatter and the 1 MB
+size limit) and sidecar freshness (every document has a sidecar
 that matches it, no orphans, one shared embedding model). Run it after
 \`md-rag embed\`. Reports every problem, keyed by path.
 

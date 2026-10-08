@@ -20,7 +20,7 @@ import {
 describe("engine startup", () => {
   const kbs = scratchKnowledgeBases("md-rag-engine-startup-");
   const freshKnowledgeBase = kbs.fresh;
-  it("refuses to start with a default weight for an undeclared signal", async () => {
+  it("refuses to start with a default weight for an unknown signal", async () => {
     const dir = await freshKnowledgeBase("weights");
     await writeMarkdown(dir, "a.md", frontmatter(), "Alpha.");
 

@@ -10,11 +10,8 @@ export function toSummaryOutput(
     ref,
     path: summary.path,
     title: summary.title,
-    source: summary.source,
     tags: summary.tags,
     updated_at: summary.updatedAt,
-    ...(summary.url !== undefined && { url: summary.url }),
-    signals: summary.signals,
     meta: summary.meta,
   };
 }

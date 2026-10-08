@@ -1,8 +1,7 @@
 ---
 title: "On-Call Escalation Policy"
-source: runbook
 updated_at: "2026-04-18"
-tags: [on-call, process]
+tags: [on-call, process, runbook]
 ---
 
 # On-Call Escalation Policy

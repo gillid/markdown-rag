@@ -1,8 +1,6 @@
 ---
 title: "Pagination"
-source: api
 updated_at: "2025-10-11"
-url: "https://docs.orbitside.dev/api/pagination"
 tags: [api]
 ---
 

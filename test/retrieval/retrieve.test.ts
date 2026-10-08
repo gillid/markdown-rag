@@ -48,7 +48,7 @@ async function writeDocument(
   await mkdir(dirname(file), { recursive: true });
   const header = Object.entries({
     title: "Signing keys",
-    source: "docs",
+    tags: "[]",
     ...frontmatter,
   }).map(([key, value]) => `${key}: ${value}`);
   await writeFile(file, `---\n${header.join("\n")}\n---\n\n${body}\n`, "utf8");
@@ -105,8 +105,8 @@ describe("retrieve over examples/docs", () => {
   });
 });
 
-// Bespoke fixtures: the recency and signal cases need two documents with identical text that differ
-// only in `updated_at` or a declared signal, which `examples/docs` has no pair for.
+// Bespoke fixtures: the recency cases need two documents with identical text that differ
+// only in `updated_at`, which `examples/docs` has no pair for.
 describe("retrieve", () => {
   let root: string;
   let index: KnowledgeIndex;
@@ -137,22 +137,6 @@ describe("retrieve", () => {
       "stale.md",
       { updated_at: "2025-01-10" },
       KEY_ROTATION,
-    );
-    await writeDocument(
-      docs,
-      "trusted.md",
-      {
-        title: "Paging policy",
-        updated_at: "2025-01-10",
-        signals: "{ authority: 0.9 }",
-      },
-      "Escalate paging alerts to the on-call engineer.",
-    );
-    await writeDocument(
-      docs,
-      "untrusted.md",
-      { title: "Paging rules", updated_at: "2025-01-10" },
-      "Escalate paging alerts to the on-call engineer.",
     );
     await writeDocument(
       docs,
@@ -230,36 +214,13 @@ describe("retrieve", () => {
     ]);
   });
 
-  it("ranks a document with a higher declared signal first only while it has a weight", async () => {
-    const run = retriever(constantReranker());
-    const request = {
-      query: "escalate paging alerts",
-      mode: "keyword" as const,
-    };
-
-    const weighted = await run({ ...request, weights: { authority: 0.3 } });
-    const unweighted = await run(request);
-
-    expect(weighted.results.map((r) => r.summary.path)).toEqual([
-      "trusted.md",
-      "untrusted.md",
-    ]);
-    expect(weighted.results[0]?.scores.signals.authority).toBe(0.9);
-    expect(unweighted.results[0]?.scores.final).toBe(
-      unweighted.results[1]?.scores.final,
-    );
-    expect(unweighted.results[0]?.scores.signals).not.toHaveProperty(
-      "authority",
-    );
-  });
-
-  it("rejects a weight for a signal no document declares", async () => {
+  it("rejects a weight for any signal but recency", async () => {
     await expect(
       retriever(constantReranker())({
         query: "key",
-        weights: { reviewed: 0.1 },
+        weights: { authority: 0.1 },
       }),
-    ).rejects.toThrow("no document declares");
+    ).rejects.toThrow('the only signal is "recency"');
   });
 
   it("uses the reranker's logits for relevance and ordering", async () => {

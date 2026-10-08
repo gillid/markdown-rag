@@ -1,6 +1,6 @@
 import type { Overview } from "../../engine/index.ts";
 
-function countedList(heading: string, entries: Overview["sources"]): string {
+function countedList(heading: string, entries: Overview["tags"]): string {
   const lines =
     entries.length === 0
       ? ["(none)"]
@@ -18,10 +18,5 @@ export function renderOverview(overview: Overview): string {
     `- index_version: ${overview.index_version}`,
     "",
   ].join("\n");
-  return [
-    header,
-    countedList("Sources", overview.sources),
-    countedList("Tags", overview.tags),
-    countedList("Signals", overview.signals),
-  ].join("\n");
+  return [header, countedList("Tags", overview.tags)].join("\n");
 }

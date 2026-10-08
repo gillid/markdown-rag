@@ -9,14 +9,9 @@ import {
 describe("engine over bespoke knowledge bases", () => {
   const kbs = scratchKnowledgeBases("md-rag-engine-documents-");
   const freshKnowledgeBase = kbs.fresh;
-  it("counts documents, chunks and signals within a filter", async () => {
+  it("counts documents, chunks and tags within a filter", async () => {
     const dir = await freshKnowledgeBase("counts");
-    await writeMarkdown(
-      dir,
-      "a.md",
-      frontmatter(["signals:", "  authority: 0.9"]),
-      "Alpha text.",
-    );
+    await writeMarkdown(dir, "a.md", frontmatter(), "Alpha text.");
     await writeMarkdown(
       dir,
       "b.md",
@@ -35,34 +30,26 @@ describe("engine over bespoke knowledge bases", () => {
       documents: 3,
       chunks: 3,
       tags: [{ name: "x", documents: 2 }],
-      signals: [{ name: "authority", documents: 1 }],
     });
     expect(await engine.overview({ dir: "sub" })).toMatchObject({
       documents: 1,
       chunks: 1,
       tags: [{ name: "x", documents: 1 }],
-      signals: [],
     });
     expect(await engine.overview({ tags: ["missing"] })).toMatchObject({
       documents: 0,
       chunks: 0,
-      sources: [],
+      tags: [],
     });
   });
 
-  it("passes unknown frontmatter through as meta, beside the url", async () => {
+  it("passes unknown frontmatter through as meta", async () => {
     const dir = await freshKnowledgeBase("meta");
-    await writeMarkdown(
-      dir,
-      "a.md",
-      frontmatter(["url: https://example.com/a", "owner: gateway"]),
-      "Alpha.",
-    );
+    await writeMarkdown(dir, "a.md", frontmatter(["owner: gateway"]), "Alpha.");
     const engine = await engineOver(kbs.workDir("meta"), dir);
 
     const [summary] = (await engine.listDocuments()).documents;
     expect(summary).toMatchObject({
-      url: "https://example.com/a",
       meta: { owner: "gateway" },
     });
   });
@@ -112,25 +99,6 @@ describe("engine over bespoke knowledge bases", () => {
     expect(
       (await engine.search({ query: "keys", limit: 3 })).results,
     ).toHaveLength(3);
-  });
-
-  it("keeps recency when only another signal's weight is configured", async () => {
-    const dir = await freshKnowledgeBase("signal-weights");
-    await writeMarkdown(
-      dir,
-      "a.md",
-      frontmatter(["signals:", "  authority: 0.9"]),
-      "Keys alpha.",
-    );
-    const engine = await engineOver(kbs.workDir("signal-weights"), dir, {
-      weights: { authority: 0.2 },
-    });
-
-    const [result] = (await engine.search({ query: "keys" })).results;
-    expect(Object.keys(result?.scores.signals ?? {}).sort()).toEqual([
-      "authority",
-      "recency",
-    ]);
   });
 
   it("describes an empty knowledge base", async () => {

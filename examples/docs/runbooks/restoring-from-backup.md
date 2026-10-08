@@ -1,8 +1,7 @@
 ---
 title: "Restoring the Primary Database from Backup"
-source: runbook
 updated_at: "2026-02-14"
-tags: [database, infra, disaster-recovery]
+tags: [database, infra, disaster-recovery, runbook]
 ---
 
 # Restoring the Primary Database from Backup

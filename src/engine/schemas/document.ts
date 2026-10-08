@@ -6,11 +6,8 @@ export const documentSummarySchema = z.strictObject({
   ref: z.string(),
   path: z.string(),
   title: z.string(),
-  source: z.string(),
   tags: z.array(z.string()),
   updated_at: z.number(),
-  url: z.string().optional(),
-  signals: z.record(z.string(), z.number()),
   meta: z.record(z.string(), z.unknown()),
 });
 

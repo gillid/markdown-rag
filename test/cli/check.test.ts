@@ -339,7 +339,7 @@ function goodDoc(title: string): string {
   return [
     "---",
     `title: "${title}"`,
-    "source: docs",
+    "tags: []",
     'updated_at: "2026-01-15"',
     "---",
     "",

@@ -11,11 +11,9 @@ export function createChunkSchema(dims: number) {
     title: "string",
     breadcrumb: "string",
     text: "string",
-    source: "enum",
     tags: "enum[]",
     dirs: "enum[]",
     updated_at: "number",
-    url: "enum",
     anchor: "enum",
     embedding,
   } as const;

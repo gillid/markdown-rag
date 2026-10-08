@@ -3,7 +3,6 @@ import type { Filter } from "../index/filter.ts";
 import { FlagError } from "./flag-error.ts";
 
 export const FILTER_OPTIONS = {
-  source: { type: "string", multiple: true },
   tag: { type: "string", multiple: true },
   "tag-any": { type: "string", multiple: true },
   dir: { type: "string" },
@@ -11,7 +10,6 @@ export const FILTER_OPTIONS = {
 } as const;
 
 export const FILTER_HELP = `Filter (shared by every query command):
-  --source <name>   Only this source; repeat for any of several
   --tag <tag>       Only documents with this tag; repeat to require all
   --tag-any <tag>   Only documents with at least one of these tags; repeatable
   --dir <path>      Only documents under this directory of the knowledge base
@@ -19,7 +17,6 @@ export const FILTER_HELP = `Filter (shared by every query command):
 `;
 
 export interface FilterFlagValues {
-  source?: string[];
   tag?: string[];
   "tag-any"?: string[];
   dir?: string;
@@ -28,7 +25,6 @@ export interface FilterFlagValues {
 
 export function filterFromFlags(values: FilterFlagValues): Filter {
   const filter: Filter = {};
-  if (values.source !== undefined) filter.sources = values.source;
   if (values.tag !== undefined) filter.tags = values.tag;
   if (values["tag-any"] !== undefined) filter.tags_any = values["tag-any"];
   if (values.dir !== undefined) filter.dir = values.dir;

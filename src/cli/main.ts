@@ -15,7 +15,7 @@ export const HELP = `Usage: md-rag <command> [options]
 Commands:
   check     Validate the knowledge base contract
   embed     Chunk and embed documents into sidecars
-  overview  Count documents and list the sources, tags and signals
+  overview  Count documents and list the tags
   search    Ranked, cited search
   list      List documents, unranked
   get       Print one document or section

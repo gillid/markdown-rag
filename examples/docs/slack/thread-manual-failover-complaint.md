@@ -1,8 +1,8 @@
 ---
 title: "Slack thread: promoting a replica is way too manual right now"
-source: slack
 updated_at: "2023-09-05"
 channel: "#infra"
+tags: [slack]
 ---
 
 # Slack thread: promoting a replica is way too manual right now

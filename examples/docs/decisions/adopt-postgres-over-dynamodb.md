@@ -1,8 +1,7 @@
 ---
 title: "Decision: Adopt Postgres Over DynamoDB for Core Data"
-source: decision
 updated_at: "2025-06-01"
-tags: [database, infra]
+tags: [database, infra, decision]
 ---
 
 # Decision: Adopt Postgres Over DynamoDB for Core Data

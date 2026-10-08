@@ -1,9 +1,8 @@
 ---
 title: "Slack thread: do we really need a query language for the dashboard API"
-source: slack
 updated_at: "2026-08-20"
 channel: "#api-platform"
-tags: [api]
+tags: [api, slack]
 ---
 
 # Slack thread: do we really need a query language for the dashboard API

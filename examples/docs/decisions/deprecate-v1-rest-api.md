@@ -1,9 +1,7 @@
 ---
 title: "Decision: Deprecate the v1 REST API"
-source: decision
 updated_at: "2026-05-01"
-url: "https://status.orbitside.dev/changelog/v1-deprecation"
-tags: [api]
+tags: [api, decision]
 ---
 
 # Decision: Deprecate the v1 REST API

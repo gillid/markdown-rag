@@ -13,7 +13,6 @@ import { joinChunks, mergeAndExpand, type ScoredHit } from "./merge.ts";
 import { mergeWeights, resolveDefaults, validateOptions } from "./options.ts";
 import {
   blend,
-  declaredSignals,
   normaliseScores,
   recencyScore,
   sigmoid,
@@ -38,9 +37,8 @@ function passageOf(chunk: IndexedChunk): string {
 /** Binds an index and its models; `retrieve` runs the whole read path for one request (ADR-012, ADR-013, ADR-027, ADR-034). */
 export function createRetriever(deps: RetrieverDeps) {
   const { index, embedder, reranker } = deps;
-  const defaults = resolveDefaults(deps.defaults, index.documents.values());
+  const defaults = resolveDefaults(deps.defaults);
   const now = deps.now ?? Date.now;
-  const declared = declaredSignals(index.documents.values());
   if (defaults.rerank && reranker === undefined) {
     throw new TypeError("a reranker is required while rerank is on");
   }
@@ -78,7 +76,7 @@ export function createRetriever(deps: RetrieverDeps) {
       throw new RetrievalOptionError("the query must not be blank");
     }
     validateOptions({ mode, limit, expand, minScore });
-    validateWeights(weights, declared);
+    validateWeights(weights);
 
     const vector =
       mode === "keyword" ? undefined : await embedder.embedQuery(request.query);
@@ -102,7 +100,7 @@ export function createRetriever(deps: RetrieverDeps) {
         clock,
         defaults.halfLifeDays,
       );
-      const signals = signalValues(summary, weights, recency);
+      const signals = signalValues(weights, recency);
       const rerank = logits[i] ?? null;
       const relevanceScore = relevance[i] ?? 0;
       const final = blend(relevanceScore, weights, signals);
