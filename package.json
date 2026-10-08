@@ -3,6 +3,12 @@
   "version": "0.1.0",
   "description": "Serves a Git repository of Markdown files to AI agents via in-process hybrid search.",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/gillid/md-rag.git"
+  },
+  "homepage": "https://github.com/gillid/md-rag#readme",
+  "bugs": "https://github.com/gillid/md-rag/issues",
   "type": "module",
   "packageManager": "pnpm@10.18.3",
   "bin": {
