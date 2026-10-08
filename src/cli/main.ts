@@ -87,8 +87,12 @@ function isEntryPoint(): boolean {
   if (script === undefined) return false;
   try {
     return import.meta.url === pathToFileURL(realpathSync(script)).href;
-  } catch {
-    return false;
+  } catch (error) {
+    // `node -` and similar pass an argv[1] that is no file, so this module was imported, not run.
+    if (error instanceof Error && "code" in error && error.code === "ENOENT") {
+      return false;
+    }
+    throw error;
   }
 }
 
