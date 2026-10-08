@@ -75,6 +75,8 @@ Also `GET /overview`, `GET /documents` and `GET /documents/{ref}`. `GET /healthz
 npm install markdown-rag
 ```
 
+TypeScript projects also need `@types/node` (version 24 or later), which the handler's types refer to.
+
 ```ts
 import { createEngine } from "markdown-rag";
 

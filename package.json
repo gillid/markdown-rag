@@ -56,6 +56,14 @@
       "lefthook"
     ]
   },
+  "peerDependencies": {
+    "@types/node": ">=24"
+  },
+  "peerDependenciesMeta": {
+    "@types/node": {
+      "optional": true
+    }
+  },
   "dependencies": {
     "@huggingface/transformers": "^4.3.0",
     "@orama/orama": "^3.1.18",
