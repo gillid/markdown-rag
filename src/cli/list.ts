@@ -15,6 +15,7 @@ import {
   parseEnumFlag,
 } from "./flag-values.ts";
 import { parseFlags } from "./parse-flags.ts";
+import { SHOW_HELP } from "./preflight.ts";
 import { renderList } from "./render/render-list.ts";
 import { type CliResult, toJson } from "./result.ts";
 import {
@@ -24,7 +25,6 @@ import {
   defaultQueryDeps,
   type QueryDeps,
   runQuery,
-  SHOW_HELP,
 } from "./run-query.ts";
 
 export const LIST_HELP = `Usage: md-rag list --source-dir <dir> [options]

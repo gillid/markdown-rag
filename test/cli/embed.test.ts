@@ -47,6 +47,18 @@ describe("md-rag embed", () => {
     const result = await runEmbed(["--bogus"], deps);
     expect(result.exitCode).toBe(1);
     expect(result.stderr).toContain("Usage: md-rag embed");
+    expect(result.stderr).toMatch(/^embed: Unknown option '--bogus'/);
+  });
+
+  it("prefixes a repeated flag with the command and prints usage", async () => {
+    const result = await runEmbed(
+      ["--source-dir", "a", "--source-dir", "b"],
+      deps,
+    );
+    expect(result.exitCode).toBe(1);
+    expect(result.stderr).toMatch(
+      /^embed: --source-dir was given more than once\n\nUsage: md-rag embed/,
+    );
   });
 
   it("writes sidecars and prints a summary", async () => {

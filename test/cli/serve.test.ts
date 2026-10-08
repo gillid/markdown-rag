@@ -39,6 +39,21 @@ describe("md-rag serve", () => {
     expect(result.stdout).toContain("Usage: md-rag serve");
   });
 
+  it("reports an unknown flag and a repeated flag as usage failures", async () => {
+    const unknown = await runServe(["--bogus"], deps());
+    const repeated = await runServe(
+      ["--source-dir", "a", "--source-dir", "b"],
+      deps(),
+    );
+
+    expect(unknown.exitCode).toBe(1);
+    expect(unknown.stderr).toMatch(/^serve: Unknown option '--bogus'/);
+    expect(unknown.stderr).toContain("Usage: md-rag serve");
+    expect(repeated.stderr).toMatch(
+      /^serve: --source-dir was given more than once\n\nUsage: md-rag serve/,
+    );
+  });
+
   it("rejects a missing source dir and a bad port before listening", async () => {
     const noSource = await runServe([], deps());
     const badPort = await runServe(

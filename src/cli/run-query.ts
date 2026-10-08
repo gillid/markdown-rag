@@ -1,16 +1,13 @@
 import { ConfigError, type ConfigInput } from "../config/config.ts";
-import {
-  type FailureKind,
-  operationFailureKind,
-} from "../engine/failure-kind.ts";
+import { operationFailureKind } from "../engine/failure-kind.ts";
 import {
   createEngine,
   type Engine,
   type EngineOptions,
 } from "../engine/index.ts";
-import { errorMessage, isErrnoException } from "../errors.ts";
-import { failure, wantsJson } from "./failure.ts";
+import { wantsJson } from "./failure.ts";
 import { FlagError } from "./flag-error.ts";
+import { commandFailure, preflight, type SHOW_HELP } from "./preflight.ts";
 import type { CliResult } from "./result.ts";
 
 // `argv` is kept raw because `--json` must be readable even when the arguments don't parse.
@@ -44,9 +41,6 @@ export interface CommonFlagValues {
   "target-dir"?: string;
 }
 
-// Returned instead of an invocation so that help wins over every flag value.
-export const SHOW_HELP = "help";
-
 export interface QueryInvocation {
   sourceDir?: string;
   targetDir?: string;
@@ -65,40 +59,15 @@ export function commonInvocation(
   };
 }
 
-/** `parseArgs` reports a bad flag with an `ERR_PARSE_ARGS_*` code; any other failure is a bug and must surface. */
-export function isFlagFailure(cause: unknown): cause is Error {
-  return (
-    cause instanceof FlagError ||
-    (isErrnoException(cause) &&
-      cause.code?.startsWith("ERR_PARSE_ARGS") === true)
-  );
-}
-
 export async function runQuery(
   { command, help, argv }: QueryCommand,
   deps: QueryDeps,
   parse: () => QueryInvocation | typeof SHOW_HELP,
 ): Promise<CliResult> {
-  const fail = (kind: FailureKind, cause: unknown) =>
-    failure(command, kind, errorMessage(cause), {
-      json: wantsJson(argv),
-      help,
-    });
-
-  let invocation: QueryInvocation | typeof SHOW_HELP;
-  try {
-    invocation = parse();
-  } catch (cause) {
-    if (isFlagFailure(cause)) return fail("usage", cause);
-    throw cause;
-  }
-
-  if (invocation === SHOW_HELP) {
-    return { exitCode: 0, stdout: help, stderr: "" };
-  }
-  if (invocation.sourceDir === undefined) {
-    return fail("usage", "--source-dir is required");
-  }
+  const descriptor = { command, help, json: wantsJson(argv) };
+  const opening = preflight(descriptor, parse);
+  if (!opening.ok) return opening.result;
+  const invocation = opening.values;
 
   let engine: Engine;
   try {
@@ -113,7 +82,11 @@ export async function runQuery(
     );
   } catch (cause) {
     // A rejected setting is the caller's to fix; any other failure to start is not.
-    return fail(cause instanceof ConfigError ? "usage" : "startup", cause);
+    return commandFailure(
+      descriptor,
+      cause instanceof ConfigError ? "usage" : "startup",
+      cause,
+    );
   }
 
   try {
@@ -123,7 +96,7 @@ export async function runQuery(
       stderr: "",
     };
   } catch (cause) {
-    return fail(operationFailureKind(cause), cause);
+    return commandFailure(descriptor, operationFailureKind(cause), cause);
   }
 }
 

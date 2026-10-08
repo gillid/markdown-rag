@@ -6,6 +6,7 @@ import {
 } from "./filter-flags.ts";
 import { checkAgainstSchema } from "./flag-values.ts";
 import { parseFlags } from "./parse-flags.ts";
+import { SHOW_HELP } from "./preflight.ts";
 import { renderOverview } from "./render/render-overview.ts";
 import { type CliResult, toJson } from "./result.ts";
 import {
@@ -15,7 +16,6 @@ import {
   defaultQueryDeps,
   type QueryDeps,
   runQuery,
-  SHOW_HELP,
 } from "./run-query.ts";
 
 export const OVERVIEW_HELP = `Usage: md-rag overview --source-dir <dir> [options]
