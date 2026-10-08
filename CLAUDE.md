@@ -62,8 +62,9 @@ Before reporting work as done, run `pnpm lint:fix`, `pnpm typecheck` and `pnpm t
 | Embedder and reranker | `src/models/` |
 | Orama index and candidate search | `src/index/` |
 | Retrieval pipeline (rerank, recency, cutoff) | `src/retrieval/` |
-| Library API (`createEngine`, schemas) | `src/engine/` |
-| HTTP handler and `md-rag serve` | `src/http/` |
+| Library API (`createEngine`, `createHttpHandler`, schemas) | `src/engine/` |
+| HTTP handler (`createHttpHandler`), server and `Host`/body checks | `src/http/` |
+| `md-rag serve` | `src/cli/serve.ts` |
 | Eval and benchmarks | `src/eval/` |
 | Orama docs | https://docs.orama.com |
 | transformers.js docs | https://huggingface.co/docs/transformers.js |
