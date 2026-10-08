@@ -25,9 +25,9 @@ jobs:
       - run: pnpm lint
       - run: pnpm typecheck
       - run: pnpm test
-      - run: pnpm test:pack
-      # pnpm pack applies publishConfig; npm publish then ships that tarball as-is, with OIDC provenance.
+      # pnpm pack applies publishConfig; npm publish then ships that same tarball as-is, with OIDC provenance.
       - run: pnpm pack --pack-destination "$RUNNER_TEMP"
+      - run: pnpm test:pack "$RUNNER_TEMP/markdown-rag-${GITHUB_REF_NAME#v}.tgz"
       - name: Publish (prereleases go to the next tag, never latest)
         run: |
           case "$GITHUB_REF_NAME" in *-*) dist_tag=next ;; *) dist_tag=latest ;; esac
