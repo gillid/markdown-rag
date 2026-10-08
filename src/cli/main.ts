@@ -1,3 +1,5 @@
+#!/usr/bin/env node
+import { realpathSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 import { runCheck } from "./check.ts";
 import { runEmbed } from "./embed.ts";
@@ -79,9 +81,17 @@ async function main(): Promise<void> {
   if (result.stopProcess) process.exit();
 }
 
-if (
-  process.argv[1] !== undefined &&
-  import.meta.url === pathToFileURL(process.argv[1]).href
-) {
+// argv[1] is a symlink when run through an installed bin, so resolve it first.
+function isEntryPoint(): boolean {
+  const script = process.argv[1];
+  if (script === undefined) return false;
+  try {
+    return import.meta.url === pathToFileURL(realpathSync(script)).href;
+  } catch {
+    return false;
+  }
+}
+
+if (isEntryPoint()) {
   main();
 }
