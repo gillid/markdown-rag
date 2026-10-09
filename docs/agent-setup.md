@@ -2,7 +2,7 @@
 
 An agent needs two things to use a knowledge base served by markdown-rag: a short note in its standing context that says what the tool is and where to learn more, and a working guide it reads when it decides to use the tool. This page holds the note. The guide is [agent-guide.md](agent-guide.md), which the package ships.
 
-Every consumer of the package has the same interface (ADR-029), so the note needs no adapting beyond its two placeholders.
+Every consumer of the package has the same interface, so the note needs no adapting beyond its two placeholders.
 
 ## Prepare the knowledge base
 
