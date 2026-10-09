@@ -18,7 +18,7 @@ export function embedderFor(config: Config, index: KnowledgeIndex): Embedder {
   const preset = findEmbeddingPreset(index.model.modelId);
   if (preset === undefined) {
     throw new Error(
-      `the sidecars were built with the unknown embedding model "${index.model.modelId}"; run md-rag embed with this version`,
+      `the sidecars were built with the unknown embedding model "${index.model.modelId}"; run markdown-rag embed with this version`,
     );
   }
   return createTransformersEmbedder(config, preset);

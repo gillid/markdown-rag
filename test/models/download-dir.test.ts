@@ -18,7 +18,7 @@ describe("prepareDownloadDir", () => {
   }
 
   beforeAll(async () => {
-    root = await mkdtemp(join(tmpdir(), "md-rag-download-dir-"));
+    root = await mkdtemp(join(tmpdir(), "markdown-rag-download-dir-"));
   });
 
   afterAll(async () => {

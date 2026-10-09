@@ -12,19 +12,20 @@
   "type": "module",
   "packageManager": "pnpm@10.18.3",
   "bin": {
-    "md-rag": "./src/cli/main.ts"
+    "markdown-rag": "./src/cli/main.ts"
   },
   "exports": {
     ".": "./src/engine/index.ts"
   },
   "files": [
     "dist/",
+    "docs/agent-guide.md",
     "LICENSE",
     "README.md"
   ],
   "publishConfig": {
     "bin": {
-      "md-rag": "./dist/cli/main.js"
+      "markdown-rag": "./dist/cli/main.js"
     },
     "exports": {
       ".": {
@@ -41,7 +42,7 @@
     "build": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\" && tsc -p tsconfig.build.json",
     "prepack": "pnpm build",
     "test:pack": "node scripts/pack-smoke.ts",
-    "md-rag": "node src/cli/main.ts",
+    "markdown-rag": "node src/cli/main.ts",
     "start": "node src/cli/main.ts serve",
     "lint": "biome check .",
     "lint:fix": "biome check --write .",

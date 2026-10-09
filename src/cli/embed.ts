@@ -13,7 +13,7 @@ import { loadConfigOutcome } from "./load-config.ts";
 import { preflight } from "./preflight.ts";
 import type { CliResult } from "./result.ts";
 
-export const EMBED_HELP = `Usage: md-rag embed --source-dir <dir> [options]
+export const EMBED_HELP = `Usage: markdown-rag embed --source-dir <dir> [options]
 
 Chunks and embeds every document whose sidecar is missing or stale, and
 deletes sidecars whose document is gone. Fails on documents that break the
@@ -21,7 +21,7 @@ contract; every other document is still written.
 
 Options:
   --source-dir <dir>  The knowledge base to embed (required)
-  --target-dir <dir>  The engine folder (default: <source-dir>/.md-rag/)
+  --target-dir <dir>  The engine folder (default: <source-dir>/.markdown-rag/)
   --models-dir <dir>  The model cache (default: <target-dir>/models/)
   --offline           Never download models; fail if they are not cached
   --rechunk           Re-chunk every document, even those that are up to date

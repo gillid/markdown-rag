@@ -23,7 +23,7 @@ export async function readSidecarEntries(
   if (!(await vectorsDirExists(vectorsDir))) {
     if (knowledgeBase.documents.length === 0) return entries;
     throw new SidecarError(
-      `no sidecars: ${vectorsDir} does not exist. Run md-rag embed first, or pass the --target-dir that embed used.`,
+      `no sidecars: ${vectorsDir} does not exist. Run markdown-rag embed first, or pass the --target-dir that embed used.`,
     );
   }
 

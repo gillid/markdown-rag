@@ -56,7 +56,7 @@ const chunkSchema = z
 
 const fileSchema = z.strictObject({
   format: z.literal(SIDECAR_FORMAT, {
-    error: `unsupported sidecar format (expected ${SIDECAR_FORMAT}); regenerate it with md-rag embed`,
+    error: `unsupported sidecar format (expected ${SIDECAR_FORMAT}); regenerate it with markdown-rag embed`,
   }),
   doc_hash: sha256,
   chunker: z.string().min(1),

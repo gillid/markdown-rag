@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { HELP, run } from "../../src/cli/main.ts";
 
-describe("md-rag CLI", () => {
+describe("markdown-rag CLI", () => {
   it("prints help and exits 0 with --help", async () => {
     expect(await run(["--help"])).toEqual({
       exitCode: 0,
@@ -10,8 +10,8 @@ describe("md-rag CLI", () => {
     });
   });
 
-  it("names the md-rag binary in the usage line", () => {
-    expect(HELP).toMatch(/^Usage: md-rag <command>/);
+  it("names the markdown-rag binary in the usage line", () => {
+    expect(HELP).toMatch(/^Usage: markdown-rag <command>/);
   });
 
   it("prints help and exits 0 with -h", async () => {
@@ -32,7 +32,7 @@ describe("md-rag CLI", () => {
       const result = await run([command, "--help"]);
 
       expect(result.exitCode).toBe(0);
-      expect(result.stdout).toContain(`Usage: md-rag ${command}`);
+      expect(result.stdout).toContain(`Usage: markdown-rag ${command}`);
     },
   );
 

@@ -19,7 +19,7 @@ export const DEFAULT_PORT = 3000;
 export const DEFAULT_HOST = "127.0.0.1";
 const MAX_PORT = 65535;
 
-export const SERVE_HELP = `Usage: md-rag serve --source-dir <dir> [options]
+export const SERVE_HELP = `Usage: markdown-rag serve --source-dir <dir> [options]
 
 Serves the knowledge base over HTTP: GET /overview, POST /search,
 GET /documents, GET /documents/{ref}, GET /healthz and GET /readyz. It starts
@@ -37,7 +37,7 @@ Options:
   --models-dir <dir>  The model cache (default: <target-dir>/models/)
   --offline           Never download models; fail if they are not cached
   --source-dir <dir>  The knowledge base to serve (required)
-  --target-dir <dir>  The engine folder (default: <source-dir>/.md-rag/)
+  --target-dir <dir>  The engine folder (default: <source-dir>/.markdown-rag/)
   -h, --help          Show this help message
 `;
 
@@ -125,10 +125,10 @@ export async function runServe(
   } catch (cause) {
     return commandFailure(descriptor, "startup", cause);
   }
-  deps.log(`md-rag: listening on ${server.host}:${server.port}`);
+  deps.log(`markdown-rag: listening on ${server.host}:${server.port}`);
   if (ownNames === undefined) {
     deps.log(
-      "md-rag: reachable beyond this machine, with no auth and no Host check; put network controls in front",
+      "markdown-rag: reachable beyond this machine, with no auth and no Host check; put network controls in front",
     );
   }
   if (!deps.shutdown.aborted) startEngine();

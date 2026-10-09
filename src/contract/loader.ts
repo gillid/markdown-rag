@@ -29,7 +29,7 @@ export interface KnowledgeBase {
 
 /**
  * Walks `config.sourceDir` for `**\/*.md`, skipping dot-directories
- * (including the default `.md-rag/`, ADR-031) and `config.targetDir` when
+ * (including the default `.markdown-rag/`, ADR-031) and `config.targetDir` when
  * it lies inside `sourceDir` under another name (ADR-037). Errors are
  * collected per file rather than thrown, so one bad document doesn't stop
  * the rest loading.

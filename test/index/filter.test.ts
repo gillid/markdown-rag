@@ -34,7 +34,7 @@ describe("filter", () => {
   }
 
   beforeAll(async () => {
-    root = await mkdtemp(join(tmpdir(), "md-rag-filter-"));
+    root = await mkdtemp(join(tmpdir(), "markdown-rag-filter-"));
     await writeDoc("a.md", {
       tags: ["x"],
       updated: "2026-01-01",

@@ -7,7 +7,7 @@ import {
 } from "../support/engine-fixtures.ts";
 
 describe("engine over bespoke knowledge bases", () => {
-  const kbs = scratchKnowledgeBases("md-rag-engine-documents-");
+  const kbs = scratchKnowledgeBases("markdown-rag-engine-documents-");
   const freshKnowledgeBase = kbs.fresh;
   it("counts documents, chunks and tags within a filter", async () => {
     const dir = await freshKnowledgeBase("counts");

@@ -58,7 +58,7 @@ describe("loadKnowledgeBase walking", () => {
   let root: string;
 
   beforeEach(async () => {
-    root = await mkdtemp(join(tmpdir(), "md-rag-loader-"));
+    root = await mkdtemp(join(tmpdir(), "markdown-rag-loader-"));
   });
 
   afterEach(async () => {
@@ -107,9 +107,9 @@ describe("loadKnowledgeBase walking", () => {
     ]);
   });
 
-  it("skips dot-directories, including the default .md-rag", async () => {
+  it("skips dot-directories, including the default .markdown-rag", async () => {
     await write("a.md", doc("A"));
-    await write(".md-rag/vectors/stray.md", doc("Stray"));
+    await write(".markdown-rag/vectors/stray.md", doc("Stray"));
     await write(".hidden/also-stray.md", doc("Also stray"));
     const { documents } = await loadKnowledgeBase(
       loadConfig({ sourceDir: root }),

@@ -11,7 +11,7 @@ describe("ensureEngineDir", () => {
   let root: string;
 
   beforeEach(async () => {
-    root = await mkdtemp(join(tmpdir(), "md-rag-engine-dir-"));
+    root = await mkdtemp(join(tmpdir(), "markdown-rag-engine-dir-"));
   });
 
   afterEach(async () => {
@@ -19,7 +19,7 @@ describe("ensureEngineDir", () => {
   });
 
   it("creates the folder with a .gitignore that ignores everything", async () => {
-    const targetDir = join(root, "nested", ".md-rag");
+    const targetDir = join(root, "nested", ".markdown-rag");
     await ensureEngineDir(targetDir);
     expect(await readFile(join(targetDir, ".gitignore"), "utf8")).toBe("*\n");
   });

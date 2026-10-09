@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { preflight } from "../../src/cli/preflight.ts";
 
-const HELP = "Usage: md-rag demo\n";
+const HELP = "Usage: markdown-rag demo\n";
 
 function open(argv: string[], json?: boolean) {
   return preflight(

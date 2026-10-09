@@ -10,11 +10,11 @@ import { DEFAULT_RETRIEVAL } from "../../src/retrieval/types.ts";
 const cwd = process.cwd();
 
 describe("loadConfig", () => {
-  it("defaults targetDir to .md-rag inside sourceDir", () => {
+  it("defaults targetDir to .markdown-rag inside sourceDir", () => {
     expect(loadConfig({ sourceDir: "examples/docs" })).toEqual({
       sourceDir: join(cwd, "examples", "docs"),
-      targetDir: join(cwd, "examples", "docs", ".md-rag"),
-      modelsDir: join(cwd, "examples", "docs", ".md-rag", "models"),
+      targetDir: join(cwd, "examples", "docs", ".markdown-rag"),
+      modelsDir: join(cwd, "examples", "docs", ".markdown-rag", "models"),
       allowRemoteModels: true,
       retrieval: {},
     });
@@ -22,11 +22,14 @@ describe("loadConfig", () => {
 
   it("resolves a relative targetDir against the current directory", () => {
     expect(
-      loadConfig({ sourceDir: "space/docs", targetDir: ".md-rag/handbook" }),
+      loadConfig({
+        sourceDir: "space/docs",
+        targetDir: ".markdown-rag/handbook",
+      }),
     ).toEqual({
       sourceDir: join(cwd, "space", "docs"),
-      targetDir: join(cwd, ".md-rag", "handbook"),
-      modelsDir: join(cwd, ".md-rag", "handbook", "models"),
+      targetDir: join(cwd, ".markdown-rag", "handbook"),
+      modelsDir: join(cwd, ".markdown-rag", "handbook", "models"),
       allowRemoteModels: true,
       retrieval: {},
     });
@@ -35,10 +38,10 @@ describe("loadConfig", () => {
   it("lets several knowledge bases share one models cache", () => {
     const shared = loadConfig({
       sourceDir: "a",
-      targetDir: ".md-rag/a",
-      modelsDir: ".md-rag/models",
+      targetDir: ".markdown-rag/a",
+      modelsDir: ".markdown-rag/models",
     });
-    expect(shared.modelsDir).toBe(join(cwd, ".md-rag", "models"));
+    expect(shared.modelsDir).toBe(join(cwd, ".markdown-rag", "models"));
   });
 
   it("can disallow remote models", () => {
@@ -65,26 +68,30 @@ describe("loadConfig", () => {
 
   it("accepts a modelsDir inside targetDir even when targetDir is inside sourceDir", () => {
     expect(
-      loadConfig({ sourceDir: "docs", modelsDir: "docs/.md-rag/cache" })
+      loadConfig({ sourceDir: "docs", modelsDir: "docs/.markdown-rag/cache" })
         .modelsDir,
-    ).toBe(join(cwd, "docs", ".md-rag", "cache"));
+    ).toBe(join(cwd, "docs", ".markdown-rag", "cache"));
   });
 
   it("accepts a modelsDir shared by several engine folders", () => {
     expect(
       loadConfig({
         sourceDir: "docs",
-        targetDir: ".md-rag/a",
-        modelsDir: ".md-rag",
+        targetDir: ".markdown-rag/a",
+        modelsDir: ".markdown-rag",
       }).modelsDir,
-    ).toBe(join(cwd, ".md-rag"));
+    ).toBe(join(cwd, ".markdown-rag"));
   });
 
-  it.each([".md-rag/vectors", ".md-rag/vectors/cache"])(
+  it.each([".markdown-rag/vectors", ".markdown-rag/vectors/cache"])(
     "rejects a modelsDir that is the sidecar folder or inside it (%s)",
     (modelsDir) => {
       expect(() =>
-        loadConfig({ sourceDir: "docs", targetDir: ".md-rag", modelsDir }),
+        loadConfig({
+          sourceDir: "docs",
+          targetDir: ".markdown-rag",
+          modelsDir,
+        }),
       ).toThrow(/sidecar folder.*at modelsDir/s);
     },
   );

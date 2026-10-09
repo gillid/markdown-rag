@@ -39,7 +39,7 @@ describe.each(commands)("%s --help", (name, run) => {
   const expectHelp = (result: CliResult) => {
     expect(result.exitCode).toBe(0);
     expect(result.stderr).toBe("");
-    expect(result.stdout).toContain(`Usage: md-rag ${name}`);
+    expect(result.stdout).toContain(`Usage: markdown-rag ${name}`);
   };
 
   it("wins over a repeated flag", async () => {

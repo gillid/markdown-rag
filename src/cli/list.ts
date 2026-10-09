@@ -24,7 +24,7 @@ import {
   runQuery,
 } from "./run-query.ts";
 
-export const LIST_HELP = `Usage: md-rag list --source-dir <dir> [options]
+export const LIST_HELP = `Usage: markdown-rag list --source-dir <dir> [options]
 
 Lists the documents that match the filter, unranked: one line per document
 with its ref, title, updated date and tags. Use it to enumerate or to

@@ -79,7 +79,7 @@ export async function buildIndex(
       if (!(cause instanceof SidecarError)) throw cause;
       problems.push({
         path: doc.path,
-        reason: `invalid sidecar: ${errorMessage(cause)}; run md-rag embed`,
+        reason: `invalid sidecar: ${errorMessage(cause)}; run markdown-rag embed`,
       });
     }
   }

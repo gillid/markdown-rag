@@ -36,7 +36,7 @@ export type FreshnessResult<E extends WithHeader = WithHeader> =
     }
   | { ok: false; problems: DocumentLoadError[] };
 
-const RUN_EMBED = "run md-rag embed";
+const RUN_EMBED = "run markdown-rag embed";
 const EMBED_SKIPS = "embed skips documents that fail the contract";
 
 // Judges sidecars from their headers alone (ADR-006); `sidecars` is keyed by the owning document's path.

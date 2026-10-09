@@ -24,12 +24,12 @@ import {
   runQuery,
 } from "./run-query.ts";
 
-export const SEARCH_HELP = `Usage: md-rag search "<query>" --source-dir <dir> [options]
+export const SEARCH_HELP = `Usage: markdown-rag search "<query>" --source-dir <dir> [options]
 
 Ranked, cited search. Each result prints a heading from its breadcrumb, one
 line with its updated date, ref and final score, then the
 snippet. Pass a result's ref to \`get\` to read more of the document. Put \`--\`
-before a query that starts with a dash: md-rag search --source-dir docs -- "-v flag".
+before a query that starts with a dash: markdown-rag search --source-dir docs -- "-v flag".
 
 Options:
   --mode <mode>       hybrid (default), keyword (identifiers, error codes) or semantic

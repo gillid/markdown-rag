@@ -15,7 +15,7 @@ import {
 } from "../support/engine-fixtures.ts";
 
 describe("engine over examples/docs", () => {
-  const kbs = scratchKnowledgeBases("md-rag-engine-examples-");
+  const kbs = scratchKnowledgeBases("markdown-rag-engine-examples-");
   let engine: Engine;
 
   beforeAll(async () => {

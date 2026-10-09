@@ -8,7 +8,7 @@ import type { Config } from "../../src/config/config.ts";
 import { readSidecar } from "../../src/sidecars/store.ts";
 import { createCountingEmbedder, writeDoc } from "../support/embed-fakes.ts";
 
-describe("md-rag embed", () => {
+describe("markdown-rag embed", () => {
   let root: string;
   let sourceDir: string;
   let targetDir: string;
@@ -21,7 +21,7 @@ describe("md-rag embed", () => {
   };
 
   beforeEach(async () => {
-    root = await mkdtemp(join(tmpdir(), "md-rag-embed-cli-"));
+    root = await mkdtemp(join(tmpdir(), "markdown-rag-embed-cli-"));
     sourceDir = join(root, "kb");
     targetDir = join(root, "engine");
     configs.length = 0;
@@ -34,7 +34,7 @@ describe("md-rag embed", () => {
   it("is dispatched by the main CLI and prints usage with --help", async () => {
     const result = await run(["embed", "--help"]);
     expect(result.exitCode).toBe(0);
-    expect(result.stdout).toContain("Usage: md-rag embed");
+    expect(result.stdout).toContain("Usage: markdown-rag embed");
   });
 
   it("exits 1 when --source-dir is missing", async () => {
@@ -46,7 +46,7 @@ describe("md-rag embed", () => {
   it("exits 1 on an unknown flag", async () => {
     const result = await runEmbed(["--bogus"], deps);
     expect(result.exitCode).toBe(1);
-    expect(result.stderr).toContain("Usage: md-rag embed");
+    expect(result.stderr).toContain("Usage: markdown-rag embed");
     expect(result.stderr).toMatch(/^embed: Unknown option '--bogus'/);
   });
 
@@ -57,7 +57,7 @@ describe("md-rag embed", () => {
     );
     expect(result.exitCode).toBe(1);
     expect(result.stderr).toMatch(
-      /^embed: --source-dir was given more than once\n\nUsage: md-rag embed/,
+      /^embed: --source-dir was given more than once\n\nUsage: markdown-rag embed/,
     );
   });
 

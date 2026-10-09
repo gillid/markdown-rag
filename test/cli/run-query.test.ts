@@ -6,7 +6,7 @@ describe("runQuery", () => {
     const result = await runQuery(
       {
         command: "demo",
-        help: "Usage: md-rag demo\n",
+        help: "Usage: markdown-rag demo\n",
         argv: ["--help"],
         // @ts-expect-error `json` is a common flag
         options: { json: { type: "string" } },

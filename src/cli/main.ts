@@ -10,7 +10,7 @@ import type { CliResult } from "./result.ts";
 import { runSearch } from "./search.ts";
 import { runServe } from "./serve.ts";
 
-export const HELP = `Usage: md-rag <command> [options]
+export const HELP = `Usage: markdown-rag <command> [options]
 
 Commands:
   check     Validate the knowledge base contract

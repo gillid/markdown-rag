@@ -1,5 +1,13 @@
 import { execFileSync, spawnSync } from "node:child_process";
-import { cp, mkdir, mkdtemp, readdir, rm, writeFile } from "node:fs/promises";
+import {
+  access,
+  cp,
+  mkdir,
+  mkdtemp,
+  readdir,
+  rm,
+  writeFile,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, join, resolve } from "node:path";
 
@@ -55,7 +63,7 @@ function fail(message: string): never {
   throw new Error(message);
 }
 
-const work = await mkdtemp(join(tmpdir(), "md-rag-pack-"));
+const work = await mkdtemp(join(tmpdir(), "markdown-rag-pack-"));
 try {
   let tarballPath: string;
   if (prebuiltTarball === undefined) {
@@ -83,26 +91,37 @@ try {
     consumerDir,
   );
 
-  const bin = join(consumerDir, "node_modules", ".bin", `md-rag${exe}`);
+  const bin = join(consumerDir, "node_modules", ".bin", `markdown-rag${exe}`);
 
   const help = runBin(bin, ["--help"]);
-  if (help.status !== 0 || !help.stdout.includes("Usage: md-rag")) {
-    fail(`md-rag --help failed:\n${help.stdout}${help.stderr}`);
+  if (help.status !== 0 || !help.stdout.includes("Usage: markdown-rag")) {
+    fail(`markdown-rag --help failed:\n${help.stdout}${help.stderr}`);
   }
+
+  const guide = join(
+    consumerDir,
+    "node_modules",
+    "markdown-rag",
+    "docs",
+    "agent-guide.md",
+  );
+  await access(guide).catch(() => fail(`the package ships no ${guide}`));
 
   const knowledgeBase = join(work, "docs");
   await cp(join(repoRoot, "examples", "docs"), knowledgeBase, {
     recursive: true,
-    filter: (source) => basename(source) !== ".md-rag",
+    filter: (source) => basename(source) !== ".markdown-rag",
   });
   const check = runBin(bin, ["check", "--source-dir", knowledgeBase]);
   const checkOutput = check.stdout + check.stderr;
   if (
     check.status === 0 ||
-    !checkOutput.includes("Run md-rag embed first") ||
+    !checkOutput.includes("Run markdown-rag embed first") ||
     checkOutput.includes("failed the contract")
   ) {
-    fail(`md-rag check did not stop at the missing sidecars:\n${checkOutput}`);
+    fail(
+      `markdown-rag check did not stop at the missing sidecars:\n${checkOutput}`,
+    );
   }
 
   await writeFile(join(consumerDir, "consumer.ts"), CONSUMER);

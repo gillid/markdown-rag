@@ -15,7 +15,7 @@ import {
   runQuery,
 } from "./run-query.ts";
 
-export const OVERVIEW_HELP = `Usage: md-rag overview --source-dir <dir> [options]
+export const OVERVIEW_HELP = `Usage: markdown-rag overview --source-dir <dir> [options]
 
 Counts the documents and chunks, then lists every tag with its document
 count, all within the filter. Run it first to learn the real values to filter

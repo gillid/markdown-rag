@@ -35,7 +35,7 @@ describe("searchCandidates", () => {
   let examples: KnowledgeIndex;
 
   beforeAll(async () => {
-    root = await mkdtemp(join(tmpdir(), "md-rag-candidates-"));
+    root = await mkdtemp(join(tmpdir(), "markdown-rag-candidates-"));
     examples = await buildTestIndex(EXAMPLES, join(root, "engine"));
   });
 
@@ -324,7 +324,7 @@ describe("searchCandidates when no chunk is similar to the query vector", () => 
     Float32Array.from({ length: MODEL.dims }, (_, i) => (i === at ? 1 : 0));
 
   beforeAll(async () => {
-    root = await mkdtemp(join(tmpdir(), "md-rag-candidates-orthogonal-"));
+    root = await mkdtemp(join(tmpdir(), "markdown-rag-candidates-orthogonal-"));
     for (const [name, text] of [
       ["many.md", "alpha alpha alpha alpha"],
       [
@@ -377,7 +377,7 @@ describe("searchCandidates on a knowledge base with no documents", () => {
   let empty: KnowledgeIndex;
 
   beforeAll(async () => {
-    root = await mkdtemp(join(tmpdir(), "md-rag-candidates-empty-"));
+    root = await mkdtemp(join(tmpdir(), "markdown-rag-candidates-empty-"));
     await mkdir(join(root, "kb"));
     await writeFile(join(root, "kb", ".keep"), "", "utf8");
     empty = await buildTestIndex(join(root, "kb"), join(root, "engine"));

@@ -28,7 +28,7 @@ const MODEL_ID = "bge-small-en-v1.5-q8";
 const caseInsensitiveFs = await detectCaseInsensitiveFs();
 
 async function detectCaseInsensitiveFs(): Promise<boolean> {
-  const dir = await mkdtemp(join(tmpdir(), "md-rag-case-probe-"));
+  const dir = await mkdtemp(join(tmpdir(), "markdown-rag-case-probe-"));
   try {
     await writeFile(join(dir, "probe"), "", "utf8");
     await access(join(dir, "PROBE"));
@@ -40,7 +40,7 @@ async function detectCaseInsensitiveFs(): Promise<boolean> {
   }
 }
 
-/** Generates sidecars the way `md-rag embed` does, with a fake embedder posing as the default preset. */
+/** Generates sidecars the way `markdown-rag embed` does, with a fake embedder posing as the default preset. */
 async function embedWithFakeModel(
   sourceDir: string,
   targetDir: string,
@@ -56,12 +56,12 @@ async function embedWithFakeModel(
   expect(report.failures).toEqual([]);
 }
 
-describe("md-rag check", () => {
+describe("markdown-rag check", () => {
   let root: string;
   let targetDir: string;
 
   beforeEach(async () => {
-    root = await mkdtemp(join(tmpdir(), "md-rag-check-"));
+    root = await mkdtemp(join(tmpdir(), "markdown-rag-check-"));
     targetDir = join(root, "engine");
   });
 
@@ -114,7 +114,7 @@ describe("md-rag check", () => {
 
       expect(result.exitCode).toBe(1);
       expect(result.stderr).toContain(
-        "invalid sidecar: chunk 0 does not match the document text; run md-rag embed",
+        "invalid sidecar: chunk 0 does not match the document text; run markdown-rag embed",
       );
     });
 
@@ -158,7 +158,7 @@ describe("md-rag check", () => {
     const result = await run(["check", "--bogus"]);
     expect(result.exitCode).toBe(1);
     expect(result.stdout).toBe("");
-    expect(result.stderr).toContain("Usage: md-rag check");
+    expect(result.stderr).toContain("Usage: markdown-rag check");
     expect(result.stderr).toMatch(/^check: Unknown option '--bogus'/);
   });
 
@@ -172,7 +172,7 @@ describe("md-rag check", () => {
     ]);
     expect(result.exitCode).toBe(1);
     expect(result.stderr).toMatch(
-      /^check: --source-dir was given more than once\n\nUsage: md-rag check/,
+      /^check: --source-dir was given more than once\n\nUsage: markdown-rag check/,
     );
   });
 
@@ -180,11 +180,11 @@ describe("md-rag check", () => {
     const result = await run(["check", "--help"]);
     expect(result.exitCode).toBe(0);
     expect(result.stderr).toBe("");
-    expect(result.stdout).toContain("Usage: md-rag check");
+    expect(result.stdout).toContain("Usage: markdown-rag check");
   });
 
   it("exits 1 with a clean error for a non-existent --source-dir", async () => {
-    const missing = join(tmpdir(), "md-rag-check-does-not-exist");
+    const missing = join(tmpdir(), "markdown-rag-check-does-not-exist");
     const result = await run(["check", "--source-dir", missing]);
     expect(result.exitCode).toBe(1);
     expect(result.stdout).toBe("");
@@ -209,7 +209,7 @@ describe("md-rag check", () => {
       expect(result.exitCode).toBe(1);
       expect(result.stdout).toBe("");
       expect(result.stderr).toContain(join(targetDir, "vectors"));
-      expect(result.stderr).toContain("md-rag embed");
+      expect(result.stderr).toContain("markdown-rag embed");
       expect(result.stderr).toContain("--target-dir");
     });
 
@@ -234,7 +234,7 @@ describe("md-rag check", () => {
 
       expect(result.exitCode).toBe(1);
       expect(result.stderr).toBe(
-        "nested/b.md: sidecar missing; run md-rag embed\n\n1 path(s) with sidecar problems.\n",
+        "nested/b.md: sidecar missing; run markdown-rag embed\n\n1 path(s) with sidecar problems.\n",
       );
     });
 
@@ -322,7 +322,7 @@ describe("md-rag check", () => {
         "--source-dir",
         root,
         "--target-dir",
-        join(root, ".md-rag"),
+        join(root, ".markdown-rag"),
       ]);
 
       expect(result.exitCode).toBe(1);
