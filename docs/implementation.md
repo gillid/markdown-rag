@@ -11,7 +11,7 @@ Status: `planned` · `in-progress` · `done`
 - pnpm project, Node 24 (`engines`, `.nvmrc`), `"type": "module"`, MIT `LICENSE` (ADR-020, ADR-021).
 - `tsconfig.json` set up for type stripping: `noEmit`, `erasableSyntaxOnly`, `allowImportingTsExtensions`, `verbatimModuleSyntax`, `strict`.
 - Biome, Vitest, and the scripts listed in `CLAUDE.md`. Model-backed tests (`*.models.test.ts`) are excluded from `pnpm test`.
-- An `md-rag` script (`pnpm md-rag <cmd>`) backed by `src/cli/main.ts`, which dispatches subcommands from the first positional argument; each subcommand parses its own flags with `node:util` `parseArgs`. At this stage `pnpm md-rag --help` is the only command.
+- A `markdown-rag` script (`pnpm markdown-rag <cmd>`) backed by `src/cli/main.ts`, which dispatches subcommands from the first positional argument; each subcommand parses its own flags with `node:util` `parseArgs`. At this stage `pnpm markdown-rag --help` is the only command.
 - **Done when:** `pnpm lint`, `pnpm typecheck` and `pnpm test` pass on a smoke test.
 
 ### 2. Project CI · `done`
@@ -35,21 +35,21 @@ Status: `planned` · `in-progress` · `done`
 ### 4. Config module · `done`
 
 - A single `loadConfig(input)` validates the caller's input (CLI flags, or the object passed to `createEngine`) against one zod schema, which fills in built-in defaults for the fields that have them. There's no config file, and it reads no environment variables (ADR-032).
-- It starts with the two directories only (ADR-037). `sourceDir` (`--source-dir`) is the knowledge base, is required and has no default, so nothing depends on where the process was started. `targetDir` (`--target-dir`) is the engine folder and defaults to `<sourceDir>/.md-rag/`. Relative paths resolve against the current directory, and a `targetDir` that is `sourceDir` or one of its parents is rejected. Every later step adds the fields it needs. No placeholder fields.
+- It starts with the two directories only (ADR-037). `sourceDir` (`--source-dir`) is the knowledge base, is required and has no default, so nothing depends on where the process was started. `targetDir` (`--target-dir`) is the engine folder and defaults to `<sourceDir>/.markdown-rag/`. Relative paths resolve against the current directory, and a `targetDir` that is `sourceDir` or one of its parents is rejected. Every later step adds the fields it needs. No placeholder fields.
 - The input type marks required fields; optional fields always get a default, so the resolved config is complete.
 
 ## Milestone 2: Content model
 
 ### 5. Knowledge base loader and document contract · `done`
 
-- `loadKnowledgeBase(config)` takes the resolved `Config` (step 4) and walks `config.sourceDir` for `**/*.md`, skipping dot-directories (including the default `.md-rag/`, ADR-031) and `config.targetDir` when it lies inside `sourceDir` under another name (ADR-037). Documents load in parallel; one failing document doesn't block the rest.
+- `loadKnowledgeBase(config)` takes the resolved `Config` (step 4) and walks `config.sourceDir` for `**/*.md`, skipping dot-directories (including the default `.markdown-rag/`, ADR-031) and `config.targetDir` when it lies inside `sourceDir` under another name (ADR-037). Documents load in parallel; one failing document doesn't block the rest.
 - A leading byte order mark is dropped and line endings are normalised to LF. `doc_hash` = `sha256` of the normalised file (ADR-005).
 - The document is parsed once with `mdast-util-from-markdown` plus `mdast-util-frontmatter` and the GFM table extension, so tables are real blocks for the chunker. The YAML node is read with `yaml` and validated with zod: `title`, `updated_at` and `tags` are required; unknown keys are kept as `meta` (ADR-003, ADR-023, ADR-044; the original contract had `source`, `url` and `signals` too). `updated_at` must be an ISO 8601 date (UTC midnight) or a date-time with an explicit zone; null, numbers, zone-less date-times and impossible dates are errors (ADR-003).
 - Errors are collected across all files and reported together (path plus reason). Enforces the 1 MB size limit.
 - Returns documents containing `path` (POSIX, relative to `sourceDir`), `docHash`, the parsed tree, the body, and typed metadata (`updated_at` as epoch milliseconds).
 - **Tests:** valid and invalid fixtures, including out-of-range and reserved signal names; CRLF and LF versions of a file give the same hash.
 
-### 6. `md-rag check` (contract only) · `done`
+### 6. `markdown-rag check` (contract only) · `done`
 
 - A CLI command that runs the loader and exits non-zero with the aggregated errors. Sidecar freshness is added in step 12.
 
@@ -87,7 +87,7 @@ Status: `planned` · `in-progress` · `done`
 - A shared `ensureEngineDir(targetDir)` creates `targetDir` and writes `<targetDir>/.gitignore` with its canonical content, `*`, which ignores the whole folder, restoring it when it is missing or edited, since nothing in `targetDir` is hand-edited (ADR-031, ADR-038). Model loading calls it before anything is downloaded into the default cache, and step 11 reuses it. A `modelsDir` outside `targetDir` gets a `.gitignore` of `*` only when it has none; an existing one is left alone and reported with a warning. `modelsDir` must not be `sourceDir` or one of its parents. With remote models off, loading never writes anything and a missing model fails with an error naming the repository, revision and `modelsDir`.
 - **Tests:** a `*.models.test.ts` checks that a paraphrase pair outscores an unrelated pair, that vectors have 384 dimensions and are L2-normalised, that a document's vector is identical whatever it is batched with, and that a chunk or query past the window is rejected, each with its own advice.
 
-### 11. `md-rag embed` · `done`
+### 11. `markdown-rag embed` · `done`
 
 - For each document whose `doc_hash` or chunker ID differs from its sidecar's, or whose sidecar is missing or damaged, or with `--rechunk`:
   - chunk it with the configured chunker; a chunker whose spans leave non-whitespace text in no chunk fails that document (nothing is written), because `check` and `serve` would reject the sidecar
@@ -102,9 +102,9 @@ Status: `planned` · `in-progress` · `done`
 - **Tests:** use a counting fake embedder and a fake chunker. Editing one document processes only that document and re-embeds only its changed chunks. Deleting a document prunes its sidecar. A sidecar recorded with a different model is re-embedded without re-chunking. When the embedder fails on one document, only that document is reported and every other sidecar is still written. The first run on a fresh knowledge base creates `<targetDir>/.gitignore`, and an edited one is restored to its canonical content.
 - Sidecars are never committed, including for `examples/docs` (ADR-038). Tests that need them generate them into a temporary `targetDir`.
 
-### 12. Sidecar freshness in `md-rag check` · `done`
+### 12. Sidecar freshness in `markdown-rag check` · `done`
 
-- A shared `checkFreshness(storage, sidecars)` reports documents with a missing sidecar or a `doc_hash` mismatch, orphaned sidecars, and sidecars whose recorded model or chunker ID differs from the rest. On success it returns the one model ID they share, which the read path loads (ADR-006, ADR-032). A model ID the engine has no preset for (step 10) is also an error, one that says to run `md-rag embed`, which re-embeds with the engine's model (this is what a sidecar from before the preset's ID gained its dtype looks like). It loads no model and makes no LLM call. `md-rag check` and the index (step 13) both use it. Orphaned sidecars also catch two knowledge bases sharing one `targetDir` (ADR-037). `md-rag check` always checks both the contract and freshness and is meant to run after `embed` (ADR-038). When `<targetDir>/vectors/` doesn't exist yet, it still reports contract errors, then fails with an error that names the directory it looked in and says to run `md-rag embed` first, or to pass the `--target-dir` that `embed` used (ADR-031, ADR-037).
+- A shared `checkFreshness(storage, sidecars)` reports documents with a missing sidecar or a `doc_hash` mismatch, orphaned sidecars, and sidecars whose recorded model or chunker ID differs from the rest. On success it returns the one model ID they share, which the read path loads (ADR-006, ADR-032). A model ID the engine has no preset for (step 10) is also an error, one that says to run `markdown-rag embed`, which re-embeds with the engine's model (this is what a sidecar from before the preset's ID gained its dtype looks like). It loads no model and makes no LLM call. `markdown-rag check` and the index (step 13) both use it. Orphaned sidecars also catch two knowledge bases sharing one `targetDir` (ADR-037). `markdown-rag check` always checks both the contract and freshness and is meant to run after `embed` (ADR-038). When `<targetDir>/vectors/` doesn't exist yet, it still reports contract errors, then fails with an error that names the directory it looked in and says to run `markdown-rag embed` first, or to pass the `--target-dir` that `embed` used (ADR-031, ADR-037).
 - "Fresh" has one definition, shared with `embed`'s planner: `matchesDocument` (the `doc_hash`), `matchesChunker` (the chunker ID) and `matchesModel` (model ID and dims). The read path can't know which chunker `embed` was given, so it only requires the current sidecars to share one chunker ID (ADR-039). After the headers pass, `check` also does what `serve` does when it builds the index: it decodes every vector, matches every chunk to the document text and requires the chunks to cover it, via the same `verifyChunks`, so it can't pass a sidecar that `serve` rejects (ADR-006). Only sidecars that match their document as it is now say anything about the shared model: a stale sidecar is reported as stale (naming the model it was built with, if that differs) and a document that failed the contract is ignored for the model. If the current sidecars record different models, every one of them is reported without naming a majority. A sidecar for a document that failed the contract is not an orphan, and on a case-insensitive filesystem the sidecar under a renamed document's old spelling counts as its own (the same alias rule as `embed`'s pruning).
 - A knowledge base with no documents needs no sidecars: `check` passes it, and a missing `vectors/` folder is then not an error. Contract errors and sidecar problems are always reported together.
 - **Tests:** hand-built headers cover each problem kind, including mixed chunker IDs; the CLI tests cover a header-fresh sidecar with a mismatching chunk or a non-finite vector; the CLI tests generate sidecars for `examples/docs` into a temporary `targetDir` with a fake embedder that carries the default preset's ID and dims.
@@ -158,10 +158,10 @@ Status: `planned` · `in-progress` · `done`
 ### 18. Query CLI commands · `done`
 
 - One command per operation, each building the engine and running it once (ADR-035). `overview`, `search` and `list` accept the same filter flags (`--tag`, `--tag-any`, `--dir`, `--since`, each repeatable where the filter takes a list), parsed by one shared helper; `get` takes a ref and no filter. All of them accept `--json`, which prints the matching schema instead of Markdown.
-  - `md-rag overview`: counts, then the tags with their document counts.
-  - `md-rag search "<query>" [--mode --limit --min-score --expand --weight name=value]`: for each result, a heading built from the breadcrumb; a line with the `updated` date, `ref` and the final score; then the snippet. It ends with `index_version`, or prints an explicit "no relevant context found" message when there are no results.
-  - `md-rag list [--sort --limit --offset]`: one line per document with `ref`, title, `updated` date and tags, followed by the total and the range shown.
-  - `md-rag get <ref> [--no-body]`: the summary as a header block, the outline, then the body.
+  - `markdown-rag overview`: counts, then the tags with their document counts.
+  - `markdown-rag search "<query>" [--mode --limit --min-score --expand --weight name=value]`: for each result, a heading built from the breadcrumb; a line with the `updated` date, `ref` and the final score; then the snippet. It ends with `index_version`, or prints an explicit "no relevant context found" message when there are no results.
+  - `markdown-rag list [--sort --limit --offset]`: one line per document with `ref`, title, `updated` date and tags, followed by the total and the range shown.
+  - `markdown-rag get <ref> [--no-body]`: the summary as a header block, the outline, then the body.
 - **Decided:** flags are parsed before the engine starts, so a typo or a malformed value (`--since` must be an ISO 8601 date or zoned date-time and means "updated on or after" (one millisecond earlier than the engine's exclusive `updated_after`), `--limit`, `--min-score` and `--expand` must be plain finite numbers, a single-value flag given twice is an error, `--weight` must be `name=value`, may not repeat a name and may not be `__proto__`, a negative `--min-score` is written `--min-score=-0.5` because `parseArgs` reads `-0.5` as a flag, and `--help` wins over every flag value and over a repeated flag) fails with the usage text before any index is built or model loaded. The assembled filter or request is also checked against the engine's own zod schemas before it starts, so an out-of-range `--limit`, an empty `--tag` or a backslash in `--dir` is a `usage` failure before the index is built, and only what depends on the index (a weight for a signal no document declares) reaches the engine as `invalid_request`. `overview`, `list` and `get` start the engine with `loadModels: false`; only `search` takes `--models-dir` and `--offline`. The "no relevant context found" message is followed by `index_version` like any other result. `get` accepts `--no-body`. Each search snippet is printed as a blockquote (every line prefixed with `> `), so a heading inside a chunk can't be mistaken for the start of the next result; `--json` returns the chunk text untouched. `check` and `embed` parse their flags through the same helper, so they also reject a single-value flag given twice. With `--json` a failure is one `{ "error": { "kind", "message" } }` object on stderr, stdout stays empty and the exit code is 1; `kind` is `usage` (including a configuration the engine rejects, such as a `--target-dir` that is the source dir), `invalid_request`, `not_found`, `startup` (the engine could not start: stale sidecars, models) or `internal`, and `message` is the text the plain-text output prints. The HTTP API reuses this object (step 19).
 - **Tests:** literal-output tests of the Markdown renderers (hand-written strings rather than stored snapshots), tests of the shared filter-flag parser and number flags, and end-to-end command tests over a small knowledge base using the internal `startEngine` with fake models.
 
@@ -175,7 +175,7 @@ Status: `planned` · `in-progress` · `done`
 - Query parameters map onto the shared `Filter` schema through one parser, so `GET /overview` and `GET /documents` validate filters exactly like `POST /search`.
   - `GET /healthz`: liveness, ready immediately
   - `GET /readyz`: ready only once the engine promise has resolved, that is after the index is built and the models have loaded and warmed up. Until then it, and every operation, answers 503
-- `md-rag serve [--port] [--host] [--weight name=value]` (plus `--source-dir`, `--target-dir`, `--models-dir` and `--offline`, as for `search`; `--weight` sets the deployment's default ranking weights, step 19.4) runs it on `node:http`, starts listening before the engine is ready so that `/healthz` answers at once, logs a startup failure to stderr and exits non-zero, and shuts down gracefully on SIGTERM or SIGINT. Logs go to stderr. The port and the host come only from flags, never from environment variables (ADR-032).
+- `markdown-rag serve [--port] [--host] [--weight name=value]` (plus `--source-dir`, `--target-dir`, `--models-dir` and `--offline`, as for `search`; `--weight` sets the deployment's default ranking weights, step 19.4) runs it on `node:http`, starts listening before the engine is ready so that `/healthz` answers at once, logs a startup failure to stderr and exits non-zero, and shuts down gracefully on SIGTERM or SIGINT. Logs go to stderr. The port and the host come only from flags, never from environment variables (ADR-032).
 - Every failure is the error object of ADR-041. `usage` and `invalid_request` answer 400, `not_found` 404, `internal` 500, and `startup` 503, which is also what every operation answers while the engine is pending or failed.
 - `SearchRequest` rejects a `__proto__` weight as an `invalid_request`: `JSON.parse` creates that key as an own property and zod's `record` skips it before any key check, so the weight would otherwise be ignored without an error (the CLI rejects `--weight __proto__=…`; the same fail-loud rule as a weight for an undeclared signal, ADR-034).
 - `DocumentList` echoes the `offset` and `limit` it applied, so a client (and the CLI's "Showing a–b of N" line) reports what the engine did rather than what was asked.
@@ -198,18 +198,18 @@ Status: `planned` · `in-progress` · `done`
 
 ### 19.2 Package distribution · `done`
 
-- Ship everything as one npm package, `markdown-rag` (ADR-029), with the `md-rag` binary. Set `name` to `markdown-rag`; remove `private`, add a `files` allowlist (`dist/`, `LICENSE`, `README.md`) and make sure runtime libraries are in `dependencies`.
-- `bin` maps `md-rag` to the CLI entry, which gets a `#!/usr/bin/env node` shebang. `exports` exposes the library entry from step 17 along with its types. Inside the repo both point at the `.ts` sources; pnpm's `publishConfig` points them at `dist/` for the published package.
+- Ship everything as one npm package, `markdown-rag` (ADR-029), with the `markdown-rag` binary. Set `name` to `markdown-rag`; remove `private`, add a `files` allowlist (`dist/`, `LICENSE`, `README.md`) and make sure runtime libraries are in `dependencies`.
+- `bin` maps `markdown-rag` to the CLI entry, which gets a `#!/usr/bin/env node` shebang. `exports` exposes the library entry from step 17 along with its types. Inside the repo both point at the `.ts` sources; pnpm's `publishConfig` points them at `dist/` for the published package.
 - `pnpm build` runs `tsc -p tsconfig.build.json`, which emits JS and `.d.ts` files into `dist/`. It extends `tsconfig.json`, turns off `noEmit` and `allowImportingTsExtensions`, and sets `declaration`, `rewriteRelativeImportExtensions` and an explicit `rootDir: "src"`, which TypeScript 7 requires for emit. It runs only from `prepack` (ADR-030). Add `dist/` to `.gitignore`.
 - In `CLAUDE.md`, add `pnpm build` to the commands table and note the pack-time emit in the tech stack.
 - Publishing is automated: a push to `main` runs `.github/workflows/publish.yml`, which does nothing unless `package.json`'s `version` is not on npm yet. Then it reruns lint, typecheck and the tests, packs with `pnpm pack` (so `publishConfig` applies), runs the pack check on that tarball, publishes it with `npm publish --provenance` through npm trusted publishing (OIDC), so there is no stored token, and tags the commit `v<version>` (ADR-043). One-time setup by the maintainer: register the repository and `publish.yml` as a trusted publisher for `markdown-rag` on npmjs.com, and add a `v*` tag ruleset that blocks updating and deleting tags (creating them stays open, because the workflow's own token has to). To release: bump `version` in a PR and merge it.
-- **Tests:** a CI job runs `pnpm pack`, installs the tarball into an empty temporary directory and checks three things: `md-rag --help` runs, `md-rag check` on a copy of `examples/docs` reports no contract errors and fails only with the "run `md-rag embed` first" error, and a small TypeScript consumer that imports `createEngine` from `markdown-rag` type-checks. The publish workflow runs the same check on the very tarball it then publishes. None of these download a model.
+- **Tests:** a CI job runs `pnpm pack`, installs the tarball into an empty temporary directory and checks three things: `markdown-rag --help` runs, `markdown-rag check` on a copy of `examples/docs` reports no contract errors and fails only with the "run `markdown-rag embed` first" error, and a small TypeScript consumer that imports `createEngine` from `markdown-rag` type-checks. The publish workflow runs the same check on the very tarball it then publishes. None of these download a model.
 
 ### 19.3 Slimmer frontmatter contract · `done`
 
 - The frontmatter is `title`, `updated_at` and `tags`; `tags` is required and may be empty. `source`, `url` and `signals` are no longer fields (ADR-044). A document that still has them passes them through as `meta`.
 - **Decided:** the `source` filter, `Filter.sources`, `--source`, the `source` query parameter and the `sources` and `signals` lists of `overview` are removed, and tags are the one filterable vocabulary; a `source` becomes a tag (`examples/docs` carries it as one). A result is cited by its `ref` and has no `url`. Recency stays the only signal: the `weights` map and `--weight` keep their shape with `recency` as the only valid name, so a weight for any other name is a validation error.
-- Sidecars hold no contract field, so their format is unchanged. A document edited to the new contract changes its `doc_hash`, so its old sidecar is stale and fails fast until `md-rag embed` runs.
+- Sidecars hold no contract field, so their format is unchanged. A document edited to the new contract changes its `doc_hash`, so its old sidecar is stale and fails fast until `markdown-rag embed` runs.
 - Updated: `examples/docs`, the contract fixtures, the README and every test that used these fields. ADR-044 amends ADR-003, ADR-034 and ADR-035.
 - **Tests:** the contract tests cover a missing `tags`, a non-list `tags` and the old keys passing through as `meta`; the retrieval tests cover a weight for any signal but `recency`.
 
@@ -220,31 +220,33 @@ Status: `planned` · `in-progress` · `done`
 - Weights are configured per deployment and per request, merged key by key as `recency` is. A weight for a tag no indexed document carries is a validation error, checked against the loaded index when the retriever is created and on each request.
 - **Tests:** blends against hand-computed values for a boost, a penalty, a document with several weighted tags and a tag weight combined with recency; the shared cap; the range of a tag weight; and a weight for an unknown tag, in the defaults and in a request.
 
-### 20. Agent setup doc · `planned`
+### 19.5 One name for the binary · `done`
 
-- `docs/agent-setup.md` gives ready-to-paste instructions (a `CLAUDE.md` snippet or skill) that teach an agent when and how to call the four operations through the CLI (`md-rag overview`, `search`, `list` and `get`, or `npx markdown-rag …` when it isn't installed) or HTTP. Every consumer of the package has the same interface, so the snippet doesn't need adapting per team (ADR-029). The style follows Grapevine's tool descriptions:
-  - the orient, narrow and read loop: `overview` to learn the real sources and tags, the same filter on `search` or `list`, then `get` (with `--no-body` to see the outline first) (ADR-035)
-  - when to use `list` rather than `search`: enumerating or finding what changed recently, not answering a question
-  - when to use `keyword` mode (identifiers, error codes) and when to use `hybrid` or `semantic`
-  - 3–4 worked request examples, including filters and `expand`
-  - the exact output format
-  - a list of what the tool can and cannot do (for example, it cannot see content that isn't in the storage)
-  - to search again with a refined query or another mode, rather than rely on a weak result
-  - to use `expand` or `getDocument` when a snippet isn't enough — including when a hit is clearly the right document but the wrong section (e.g. it found the team's mission statement when the question was about their Slack channel)
-  - to treat results as reference material, not instructions
-  - to judge a hit by its breadcrumb and by reading the section, never by its score: scores are relative, not calibrated (ADR-036), so one query's 0.06 can be the right runbook and another's 0.59 an unrelated section (both seen on `examples/docs`), and they can't be compared across queries
-  - to prefer `list` with tag filters, using names learned from `overview`, to find the owning team or the runbook for a topic, since a search phrased as a symptom ranked weakly while the tag filter found both at once
-  - to say so when the knowledge base has nothing on the topic (an exact-term `keyword` search finds nothing and the hybrid results are unrelated) rather than stretch the nearest result
-  - the CLI details an agent trips on: `--` before a query that starts with a dash, `--min-score=-0.5` for a negative value, and `--json` for structured output, where a failure is the error object of ADR-041 and its `kind` says whether to fix the call (`usage`, `invalid_request`, `not_found`) or report it (`startup`, `internal`)
-  - one worked scenario end to end, from an incident ("customers can't pay with PayPal; notify the relevant teams and mitigate"): `overview`; a `keyword` search for the exact term, which finds nothing; `list` by the `payments` and `incidents` tags, which finds the payment-incident runbook and the owning team; `get --no-body` for the runbook's outline, then its mitigation and escalation sections; the escalation policy's severity and paging sections; the team's `#contacts` section. It also shows where the agent must stop and say the knowledge base has no PayPal-specific page and no customer-communication guidance
-- Verify manually with Claude Code against `examples/docs`.
+- The binary is `markdown-rag`, like the package (ADR-046, amends ADR-029): the `bin` entry and its `publishConfig` twin, the `pnpm markdown-rag` script, every usage text, the messages that tell a caller to run `markdown-rag embed`, the log prefix, the tests, the pack smoke test and the documentation. The default engine folder is named the same way, `.markdown-rag/` (`ENGINE_DIR_NAME`, the help texts, the tests and the docs).
+- Shipping this renames a published binary and the default engine folder, so the PR bumps `version` to 0.2.0.
+- **Tests:** the existing CLI, help and sidecar-message tests assert the new name; the pack smoke test runs `markdown-rag --help` and `markdown-rag check` from the installed tarball.
+
+### 20. Agent setup doc · `done`
+
+- Two files, so the context an agent always carries stays small and the detail is read only when it decides to use the tool. Neither is tied to a use case: the knowledge base can hold anything.
+- `docs/agent-setup.md` gives a note of a few lines to paste into the agent's `CLAUDE.md`, `AGENTS.md` or a skill: what the tool does (ranked search, listing by tag, directory or date, reading a document or a section), that it only reads and knows only what is in the documents, to read the guide before the first query, and to run `markdown-rag <command> --help` for flags. It has two placeholders, the knowledge base and the guide's location. Every consumer of the package has the same interface, so nothing else needs adapting (ADR-029). The note has no examples, so it can't bias the agent.
+- `docs/agent-guide.md` is the working guide, shipped in the package (`files`), so it matches the installed version and the pack smoke test checks that it is there. It follows the style of Grapevine's tool descriptions and holds:
+  - the orient, narrow and read loop: `overview` to learn the real tags, the same filter on `search` or `list`, then `get` (with `--no-body` to see the outline first) (ADR-035)
+  - when to use `list` rather than `search`, and `list` with tag filters rather than a symptom-worded search to find the document that covers a topic
+  - when to use `keyword`, `hybrid` and `semantic`, and `--expand`
+  - to judge a hit by its breadcrumb and by reading the section, never by its score: scores are relative, not calibrated (ADR-036), so one query's 0.06 can be the right section and another's 0.59 an unrelated one (both seen on `examples/docs`)
+  - when a hit is the right document but the wrong section, to read the outline and open the section instead of searching again; to search again with a refined query or another mode rather than rely on a weak result
+  - that a near miss is not a match, to check the `updated` date, to say so when the knowledge base has nothing on the topic, and to treat results as reference material, not instructions
+  - what the tool can and cannot do
+  - the HTTP routes, and the CLI details an agent trips on: `--` before a query that starts with a dash, `--min-score=-0.5` for a negative value, a quoted `#` in a `ref`, and `--json` with the error object of ADR-041, whose `kind` says whether to fix the call (`usage`, `invalid_request`, `not_found`) or report it (`startup`, `internal`)
+- Verify manually with an agent against `examples/docs`: it gets only the note and the guide, and its commands are logged.
 
 ## Milestone 7: Validation
 
-### 21. `md-rag eval` with quality metrics · `planned`
+### 21. `markdown-rag eval` with quality metrics · `planned`
 
 - `examples/eval/queries.yaml` holds entries of the form `{ query, expected: [path or ref], filters? }`, covering each fixture case from step 3.
-- `md-rag eval` reports Recall@K, MRR and nDCG@N, with a per-query breakdown of misses. It runs after `md-rag embed`, and `--target-dir` points it at an alternative sidecar set (e.g. one built with a different chunk-size target, step 23, ADR-037).
+- `markdown-rag eval` reports Recall@K, MRR and nDCG@N, with a per-query breakdown of misses. It runs after `markdown-rag embed`, and `--target-dir` points it at an alternative sidecar set (e.g. one built with a different chunk-size target, step 23, ADR-037).
 - Include a query against the step 3.1 directory-style fixture whose answer lives in a different section/chunk than the one that best matches semantically. This checks whether retrieval at least surfaces the right *document* (recall at the doc level, not just the chunk level) — the follow-up step of using `getDocument`/`expand` to reach the specific fact is an agent behaviour, verified against `docs/agent-setup.md` (step 20), not a retrieval metric.
 - Add the agent-style cases found by hand on `examples/docs`: a symptom query with no exact term whose answer is the payment-incident runbook; "who do I notify" queries whose answer is the escalation policy's `#paging-tiers` and the payments team's `#contacts`; and the step 3.1 variants phrased by what the team does (mission, owned services) rather than by "Slack channel", plus a pure paraphrase ("the people who keep charges and refunds reliable") that currently misses the team document entirely.
 - Support no-answer queries, written `expected: []` (for example "PayPal", which nothing in `examples/docs` mentions, or a status-page question the knowledge base can't answer). They add nothing to recall; for each, the report lists the results returned and the best relevance, and the summary counts the queries that still returned results. This is what step 23 tunes `min_score` against, since today the default lets unrelated chunks through.
@@ -252,13 +254,13 @@ Status: `planned` · `in-progress` · `done`
 - `--save <file>` writes the metrics and per-query ranks as JSON. `--compare <file>` prints the differences against a saved run, both overall and per query (after Grapevine's `search-eval`).
 - **Tests:** metric functions checked against hand-computed worked examples.
 
-### 22. `md-rag eval --bench` · `planned`
+### 22. `markdown-rag eval --bench` · `planned`
 
 - Runs warm-up, then the query set repeated R times. Reports p50/p95/p99 for embed, search, rerank and total, and records the hardware (CPU model, core count). Record the results in `docs/benchmarks.md`.
 
-### 22.1 Corpus-size check in `md-rag check` · `planned`
+### 22.1 Corpus-size check in `markdown-rag check` · `planned`
 
-- `md-rag check` counts the chunks recorded in the sidecars and fails when the count is above a ceiling, naming the count, the ceiling and the memory it implies. Assumption A1 (~100k chunks, about 700 MB resident) is an estimate that nothing enforces today, so a corpus far beyond it only gets slower and heavier, with no error. The engine itself does not enforce it: `check` is the pipeline gate (ADR-038).
+- `markdown-rag check` counts the chunks recorded in the sidecars and fails when the count is above a ceiling, naming the count, the ceiling and the memory it implies. Assumption A1 (~100k chunks, about 700 MB resident) is an estimate that nothing enforces today, so a corpus far beyond it only gets slower and heavier, with no error. The engine itself does not enforce it: `check` is the pipeline gate (ADR-038).
 - Set the ceiling from the resident memory measured in step 22 (at least 10k and 100k chunks), and record in an ADR whether it is fixed or a `check` flag, and whether the whole-document body held per document for `getDocument` (step 17) is worth keeping or should become section ranges over the chunk text.
 - **Tests:** sidecar sets just under and just over the ceiling with fake chunks, checking the exit code and the message.
 
@@ -275,4 +277,4 @@ Status: `planned` · `in-progress` · `done`
 
 - `README.md` covers: what the project is, a no-install quick start (`npx markdown-rag embed`, `check`, `search` and `serve` against a local directory), installing it (`pnpm add markdown-rag`) for the library API, and the configuration reference (the CLI flags and the matching `createEngine` options, ADR-032).
 - The configuration reference also covers the model cache: a custom `--models-dir` is git-ignored by the engine only when it has no `.gitignore` of its own, a corrupted cache is fixed by deleting `modelsDir`, transformers.js reads `HF_TOKEN` and `HF_ACCESS_TOKEN` from the environment when it downloads, so a stale token can fail the download of the public model, and it looks in `/models/<repository>` before the cache, so a directory mounted there would shadow the pinned weights.
-- `docs/contract.md` is the full frontmatter contract (including `signals`, ADR-034), the engine folder's layout and the sidecar format, and how to run `md-rag embed` in a deployment pipeline with a cached engine folder (ADR-038), written for exporter authors and integrators. It spells out the exporter's obligations under A4: byte-identical output for unchanged content (no export timestamps in files), `updated_at` taken from the source's change time, and tags as the filterable vocabulary (ADR-035).
+- `docs/contract.md` is the full frontmatter contract (including `signals`, ADR-034), the engine folder's layout and the sidecar format, and how to run `markdown-rag embed` in a deployment pipeline with a cached engine folder (ADR-038), written for exporter authors and integrators. It spells out the exporter's obligations under A4: byte-identical output for unchanged content (no export timestamps in files), `updated_at` taken from the source's change time, and tags as the filterable vocabulary (ADR-035).
