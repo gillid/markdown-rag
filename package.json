@@ -1,6 +1,6 @@
 {
   "name": "markdown-rag",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Serves a Git repository of Markdown files to AI agents via in-process hybrid search.",
   "license": "MIT",
   "repository": {
