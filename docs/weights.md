@@ -17,7 +17,7 @@ Nudges can never outweigh relevance. The recency weight plus the largest tag wei
 
 Two things follow from this:
 
-- A boosted result that is only a weak match cannot overtake a clearly better match. Tags break ties and close calls; they do not override a good answer.
+- A tag moves a result's score by at most its weight, so a boost against a penalty can swing two results by up to twice the largest tag weight. A boosted weaker match can overtake a better one when their relevance is closer than that swing: with `tag:runbook = 0.2`, a runbook chunk with relevance `0.3` (final `0.44`) outranks a plain chunk with relevance `0.5` (final `0.40`). Keep tag weights small if relevance should usually decide.
 - `min_score` compares against relevance, not the final score. A document that is not relevant is dropped however heavily it is boosted, so weights only reorder results that already passed the cutoff.
 
 ## Setting weights
@@ -30,6 +30,11 @@ Weights are a map from a name to a number:
 | `tag:<tag>` | -1 to 1 | Boost (positive) or penalty (negative) for documents with that tag. |
 
 Any other name is an error. So is a `tag:<tag>` weight for a tag that no indexed document carries, so a typo fails loudly instead of silently ranking nothing. `md-rag overview` lists the tags that exist.
+
+Two consequences to know about:
+
+- **The default recency weight uses part of the cap.** Unless you set `recency`, it is `0.15`, so a tag weight above `0.35` is rejected until you lower recency too, for example `--weight recency=0 --weight tag:runbook=0.4`. The error message shows both numbers.
+- **A configured tag must exist in the knowledge base.** The check is made when the engine starts, against the documents it loaded, so `serve` opens its port and loads the models before it reports a typo. It also means that if a re-export removes the last document with a weighted tag, a deployment configured with that weight refuses to start until you remove the weight. That is the intended trade-off for failing loudly.
 
 You can set weights in two places, and a request overrides the deployment key by key:
 
@@ -49,7 +54,7 @@ npx markdown-rag search "rotate signing keys" --source-dir ./docs \
   --weight recency=0.1 --weight tag:runbook=0.2 --weight tag:slack=-0.1
 ```
 
-Over HTTP, send the same map as `weights` in the `POST /search` body. Setting a weight to `0` switches that nudge off; `recency: 0` turns recency off.
+`md-rag serve` takes the same repeatable `--weight` flag for the deployment's defaults. Over HTTP, send the same map as `weights` in the `POST /search` body to override them for one request. Setting a weight to `0` switches that nudge off; `recency: 0` turns recency off.
 
 ## How tags combine
 
@@ -80,7 +85,7 @@ With `tag:runbook = 0.2`, `tag:slack = -0.1` and recency off, the strongest tag 
 | `slack.md` | penalised by `0.1` | 0.30 |
 | `both.md` | `runbook`'s `0.2` is larger than `slack`'s `0.1`, so only the boost applies | 0.60 |
 
-The order is `runbook`, `both`, `plain`, `slack`: the curated page outranks the chat thread. If the slack thread were a much better match (relevance `0.9` against `0.3`), it would still win, at `0.8 × 0.9 − 0.1 = 0.62` against `0.8 × 0.3 + 0.2 = 0.44`.
+The order is `runbook`, `both`, `plain`, `slack`: the curated page outranks the chat thread. If the slack thread were a much better match (relevance `0.9` against `0.3`), it would still win, at `0.8 × 0.9 − 0.1 = 0.62` against `0.8 × 0.3 + 0.2 = 0.44`. With a smaller gap (`0.5` against `0.3`) the runbook would win, `0.44` against `0.8 × 0.5 − 0.1 = 0.30`.
 
 Adding `recency = 0.1` makes relevance keep 70% (100% minus 10% for recency minus 20% for the strongest tag). Each document then also earns up to `0.1` for freshness. The cap check is `0.1 + 0.2 = 0.3`, which is valid.
 

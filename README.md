@@ -47,7 +47,7 @@ The same four are available three ways. Every command takes `--help`.
 
 ```sh
 npx markdown-rag overview --source-dir ./docs
-npx markdown-rag search "rate limit errors" --source-dir ./docs --source runbook --limit 5
+npx markdown-rag search "rate limit errors" --source-dir ./docs --tag runbook --limit 5
 npx markdown-rag list --source-dir ./docs --since 2026-07-01 --sort updated_at
 npx markdown-rag get runbooks/rollback-a-bad-deploy.md --source-dir ./docs
 ```
@@ -84,6 +84,10 @@ const { results } = await engine.search({ query: "rate limit errors", limit: 5 }
 ```
 
 `createHttpHandler(createEngine({ sourceDir: "./docs" }))` (also imported from `markdown-rag`) takes the engine promise (so you can mount it before the models have loaded) and returns a plain `(req, res)` handler for your own server.
+
+## Ranking
+
+Results are ordered by relevance, and you can nudge the order toward newer documents or boost and penalise documents by tag. See [docs/weights.md](docs/weights.md).
 
 ## Using it from an agent
 
