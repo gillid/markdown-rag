@@ -5,10 +5,10 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/gillid/md-rag.git"
+    "url": "git+https://github.com/gillid/markdown-rag.git"
   },
-  "homepage": "https://github.com/gillid/md-rag#readme",
-  "bugs": "https://github.com/gillid/md-rag/issues",
+  "homepage": "https://github.com/gillid/markdown-rag#readme",
+  "bugs": "https://github.com/gillid/markdown-rag/issues",
   "type": "module",
   "packageManager": "pnpm@10.18.3",
   "bin": {
