@@ -32,7 +32,8 @@ Options:
   --host <address>    Address to bind (default ${DEFAULT_HOST}, this machine only; a container
                       needs 0.0.0.0. There is no auth, so put network controls in front)
   --weight <name=x>   Default ranking weight, repeatable: recency=x, or tag:<tag>=x to boost
-                      (x > 0) or penalise (x < 0) documents with that tag; a request can override it
+                      (x > 0) or penalise (x < 0) documents with that tag; a request can override it.
+                      A tag containing "=" can only be weighted through the library
   --models-dir <dir>  The model cache (default: <target-dir>/models/)
   --offline           Never download models; fail if they are not cached
   --source-dir <dir>  The knowledge base to serve (required)

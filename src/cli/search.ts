@@ -38,7 +38,8 @@ Options:
                       value with an equals sign: --min-score=-0.5
   --expand <n>        Neighbouring chunks to add on each side of a hit (maximum ${MAX_EXPAND})
   --weight <name=x>   Ranking weight, repeatable: recency=x, or tag:<tag>=x to boost
-                      (x > 0) or penalise (x < 0) documents with that tag
+                      (x > 0) or penalise (x < 0) documents with that tag; a tag
+                      containing "=" can only be weighted over HTTP or the library
   --models-dir <dir>  The model cache (default: <target-dir>/models/)
   --offline           Never download models; fail if they are not cached
 ${COMMON_HELP}

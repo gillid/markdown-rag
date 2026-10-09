@@ -54,7 +54,7 @@ npx markdown-rag search "rotate signing keys" --source-dir ./docs \
   --weight recency=0.1 --weight tag:runbook=0.2 --weight tag:slack=-0.1
 ```
 
-`md-rag serve` takes the same repeatable `--weight` flag for the deployment's defaults. Over HTTP, send the same map as `weights` in the `POST /search` body to override them for one request. Setting a weight to `0` switches that nudge off; `recency: 0` turns recency off.
+The CLI splits `--weight` at the first `=`, so it cannot weight a tag whose name contains `=`; set such a weight through HTTP or the library. `md-rag serve` takes the same repeatable `--weight` flag for the deployment's defaults. Over HTTP, send the same map as `weights` in the `POST /search` body to override them for one request. Setting a weight to `0` switches that nudge off; `recency: 0` turns recency off.
 
 ## How tags combine
 

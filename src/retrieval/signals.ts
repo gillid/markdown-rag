@@ -5,8 +5,6 @@ export const DEFAULT_RECENCY_WEIGHT = 0.15;
 const TAGS = "tags";
 const TAG_PREFIX = "tag:";
 export const MAX_TOTAL_WEIGHT = 0.5;
-// 0.1 + 0.2 + 0.2 sums to 0.5000000000000001, which is still the limit.
-const WEIGHT_TOLERANCE = 1e-9;
 
 const MS_PER_DAY = 86_400_000;
 
@@ -70,7 +68,7 @@ export function validateWeights(
   const recency = weights[RECENCY] ?? 0;
   const largestTag = tagsSignalWeight(weights);
   const total = recency + largestTag;
-  if (total > MAX_TOTAL_WEIGHT + WEIGHT_TOLERANCE) {
+  if (total > MAX_TOTAL_WEIGHT) {
     const defaultHint =
       largestTag > 0 && recency === DEFAULT_RECENCY_WEIGHT
         ? " (the default; set recency to lower it)"

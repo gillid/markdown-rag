@@ -88,6 +88,20 @@ describe("validateWeights", () => {
     expect(() => validateWeights({})).not.toThrow();
   });
 
+  it.each([
+    [0.1, 0.4],
+    [0.2, 0.3],
+    [0.15, 0.35],
+    [0.05, 0.45],
+  ])(
+    "accepts recency %s with a tag weight %s, which total exactly 0.5",
+    (recency, tag) => {
+      expect(() =>
+        validateWeights({ recency, "tag:runbook": tag }),
+      ).not.toThrow();
+    },
+  );
+
   it("accepts signed tag weights for tags that exist", () => {
     expect(() =>
       validateWeights({ "tag:runbook": 0.3, "tag:slack": -0.4 }, known),
