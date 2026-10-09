@@ -54,7 +54,8 @@ Before reporting work as done, run `pnpm lint:fix`, `pnpm typecheck` and `pnpm t
 | Idea, PoC scope, what's deferred, ADR log | `docs/design.md` |
 | Step-by-step PoC plan with statuses | `docs/implementation.md` |
 | PR review checklist (used by the automated review routine) | `REVIEW.md` |
-| Document contract and sidecar format (for exporters) | `docs/contract.md` (planned, step 21) |
+| Document contract, sidecar format and pipeline setup (for exporters and integrators) | `docs/contract.md` |
+| Configuration reference (flags and `createEngine` options, model cache) | `docs/configuration.md` |
 | Agent setup note, and the working guide that ships in the package | `docs/agent-setup.md`, `docs/agent-guide.md` |
 | Eval baseline that gates retrieval quality | `examples/eval/baseline.json` (planned, step 24) |
 | Sample knowledge base and golden queries | `examples/docs/`, `examples/eval/` (planned, steps 3, 22) |
