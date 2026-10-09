@@ -127,6 +127,12 @@ describe("engine startup", () => {
         { loadModels: false },
       ),
     ).rejects.toThrow(/limit/);
+    await expect(
+      createEngine(
+        { ...config, retrieval: { weights: { "tag:nosuch": 0.1 } } },
+        { loadModels: false },
+      ),
+    ).rejects.toThrow('no document has the tag "nosuch"');
   });
 
   it("uses the options as they were when it was called", async () => {

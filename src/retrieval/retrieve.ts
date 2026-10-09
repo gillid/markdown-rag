@@ -9,6 +9,7 @@ import {
 import type { SearchMode } from "../index/search-mode.ts";
 import { capPerDocument } from "./candidates.ts";
 import { RetrievalOptionError } from "./errors.ts";
+import { indexedTags } from "./indexed-tags.ts";
 import { joinChunks, mergeAndExpand, type ScoredHit } from "./merge.ts";
 import { mergeWeights, resolveDefaults, validateOptions } from "./options.ts";
 import {
@@ -49,9 +50,7 @@ export function createRetriever(deps: RetrieverDeps) {
     );
   }
 
-  const knownTags = new Set(
-    [...index.documents.values()].flatMap(({ summary }) => summary.tags),
-  );
+  const knownTags = indexedTags(index);
   validateWeights(defaults.weights, knownTags);
 
   function documentOf(path: string): IndexedDocument {

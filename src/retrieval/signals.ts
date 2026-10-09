@@ -2,8 +2,8 @@ import { RetrievalOptionError } from "./errors.ts";
 
 export const RECENCY = "recency";
 export const DEFAULT_RECENCY_WEIGHT = 0.15;
-export const TAGS = "tags";
-export const TAG_PREFIX = "tag:";
+const TAGS = "tags";
+const TAG_PREFIX = "tag:";
 export const MAX_TOTAL_WEIGHT = 0.5;
 // 0.1 + 0.2 + 0.2 sums to 0.5000000000000001, which is still the limit.
 const WEIGHT_TOLERANCE = 1e-9;
