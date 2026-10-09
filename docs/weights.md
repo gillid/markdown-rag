@@ -1,7 +1,6 @@
 # Ranking weights
 
-Weights let you reorder search results using more than relevance: newer documents can rank higher, a curated page can outrank a chat thread, and a noisy source can be pushed down. The decision record is ADR-034 and ADR-045 in [design.md](design.md).
-
+Weights let you reorder search results using more than relevance: newer documents can rank higher, a curated page can outrank a chat thread, and a noisy source can be pushed down.
 ## How a result is scored
 
 Every search result starts with a **relevance** score: how well the chunk answers the query, as judged by the local reranker. Weights then add nudges on top. There are two kinds:
