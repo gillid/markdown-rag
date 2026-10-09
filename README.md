@@ -10,11 +10,27 @@ Requires Node.js 24 or later.
 # 1. Prepare the knowledge base (downloads the models on first run)
 npx markdown-rag embed --source-dir ./docs
 
-# 2. Ask it something
+# 2. Confirm the documents and their generated files are consistent
+npx markdown-rag check --source-dir ./docs
+
+# 3. Ask it something
 npx markdown-rag search "how do I roll back a bad deploy?" --source-dir ./docs
+
+# 4. Or serve it over HTTP
+npx markdown-rag serve --source-dir ./docs
 ```
 
-`embed` writes its generated files to `./docs/.markdown-rag/`. Git-ignore that folder and re-run `embed` whenever the Markdown changes; only changed documents are processed again.
+`embed` writes its generated files to `./docs/.markdown-rag/`. The engine git-ignores that folder itself, and you re-run `embed` whenever the Markdown changes; only changed documents are processed again. The server and every query command refuse to start while a document and its generated files disagree, so `embed` must run first. The file formats are in [docs/contract.md](docs/contract.md).
+
+## Installing
+
+`npx markdown-rag` needs no install. To use the library API, or to pin a version for the command line, add the package to a project:
+
+```sh
+pnpm add markdown-rag
+```
+
+The command line then runs as `pnpm exec markdown-rag <command>`.
 
 ## Your documents
 
@@ -30,7 +46,7 @@ tags: [runbook, process]
 Run `orbitctl deploy rollback --service=<name>` to revert to the previous release.
 ```
 
-`title`, `updated_at` and `tags` are required (`tags` may be an empty list). Any other key is kept as pass-through metadata. `npx markdown-rag check --source-dir ./docs` validates the files and tells you what to fix.
+`title`, `updated_at` and `tags` are required (`tags` may be an empty list). Any other key is kept as pass-through metadata. `npx markdown-rag check --source-dir ./docs` validates the files and tells you what to fix. The full contract, for people who generate the Markdown, is in [docs/contract.md](docs/contract.md).
 
 ## Four operations
 
@@ -70,11 +86,7 @@ Also `GET /overview`, `GET /documents` and `GET /documents/{ref}`. `GET /healthz
 
 ### Library
 
-```sh
-npm install markdown-rag
-```
-
-TypeScript projects also need `@types/node` (version 24 or later), which the handler's types refer to.
+Install the package first (see [Installing](#installing)). TypeScript projects also need `@types/node` (version 24 or later), which the handler's types refer to.
 
 ```ts
 import { createEngine } from "markdown-rag";
@@ -84,6 +96,10 @@ const { results } = await engine.search({ query: "rate limit errors", limit: 5 }
 ```
 
 `createHttpHandler(createEngine({ sourceDir: "./docs" }))` (also imported from `markdown-rag`) takes the engine promise (so you can mount it before the models have loaded) and returns a plain `(req, res)` handler for your own server.
+
+## Configuration
+
+Everything is set with command-line flags or the object passed to `createEngine`; the engine reads no environment variables of its own and has no config file. [docs/configuration.md](docs/configuration.md) lists every flag with its library option, and covers the model cache. `markdown-rag <command> --help` prints the flags of one command.
 
 ## Ranking
 
