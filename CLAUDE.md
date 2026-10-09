@@ -54,10 +54,10 @@ Before reporting work as done, run `pnpm lint:fix`, `pnpm typecheck` and `pnpm t
 | Idea, PoC scope, what's deferred, ADR log | `docs/design.md` |
 | Step-by-step PoC plan with statuses | `docs/implementation.md` |
 | PR review checklist (used by the automated review routine) | `REVIEW.md` |
-| Document contract and sidecar format (for exporters) | `docs/contract.md` (planned, step 24) |
+| Document contract and sidecar format (for exporters) | `docs/contract.md` (planned, step 21) |
 | Agent setup note, and the working guide that ships in the package | `docs/agent-setup.md`, `docs/agent-guide.md` |
-| Benchmark and chunker comparison | `docs/benchmarks.md` (planned, steps 22–23) |
-| Sample knowledge base and golden queries | `examples/docs/`, `examples/eval/` (planned, steps 3, 21) |
+| Eval baseline that gates retrieval quality | `examples/eval/baseline.json` (planned, step 24) |
+| Sample knowledge base and golden queries | `examples/docs/`, `examples/eval/` (planned, steps 3, 22) |
 | CLI entry and subcommands | `src/cli/` |
 | Pack-time emit config and the packed-tarball smoke test | `tsconfig.build.json`, `scripts/pack-smoke.ts` |
 | Release workflow (a new `version` merged to `main` publishes to npm and tags it) | `.github/workflows/publish.yml` |
