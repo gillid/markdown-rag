@@ -126,6 +126,51 @@ describe("md-rag serve", () => {
     expect(d.logs).toEqual([]);
   });
 
+  it("passes --weight to the engine as the configured ranking weights", async () => {
+    let received: unknown;
+    const d = deps({
+      createEngine: (input) => {
+        received = input.retrieval;
+        return new Promise<Engine>(() => {});
+      },
+    });
+    const running = runServe(
+      [
+        "--source-dir",
+        "kb",
+        "--port",
+        "0",
+        "--weight",
+        "recency=0.1",
+        "--weight",
+        "tag:slack=-0.2",
+      ],
+      d,
+    );
+    await d.listening();
+
+    d.stop();
+    await running;
+    expect(received).toEqual({ weights: { recency: 0.1, "tag:slack": -0.2 } });
+  });
+
+  it.each([
+    [["--weight", "authority=0.1"], 'the signals are "recency"'],
+    [["--weight", "recency=0.9"], "at most 0.5"],
+    [["--weight", "recency"], "--weight must look like name=value"],
+  ])("rejects %j before it opens the port", async (flags, message) => {
+    const d = deps();
+
+    const result = await runServe(
+      ["--source-dir", "kb", "--port", "0", ...flags],
+      d,
+    );
+
+    expect(result.exitCode).toBe(1);
+    expect(result.stderr).toContain(message);
+    expect(d.logs).toEqual([]);
+  });
+
   it("binds this machine only by default, and the address given by --host", async () => {
     const byDefault = deps();
     const wide = deps();

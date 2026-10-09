@@ -7,8 +7,10 @@ import {
 import { createHttpHandler } from "../http/handler.ts";
 import { loopbackNames } from "../http/loopback.ts";
 import { listen } from "../http/server.ts";
+import { RetrievalOptionError } from "../retrieval/errors.ts";
+import { resolveDefaults } from "../retrieval/options.ts";
 import { FlagError } from "./flag-error.ts";
-import { parseIntegerFlag } from "./flag-values.ts";
+import { parseIntegerFlag, parseNamedNumbers } from "./flag-values.ts";
 import { commandFailure, type ParsedFlags, preflight } from "./preflight.ts";
 import type { CliResult } from "./result.ts";
 
@@ -29,6 +31,8 @@ Options:
   --port <n>          Port to listen on (default ${DEFAULT_PORT}; 0 picks a free one)
   --host <address>    Address to bind (default ${DEFAULT_HOST}, this machine only; a container
                       needs 0.0.0.0. There is no auth, so put network controls in front)
+  --weight <name=x>   Default ranking weight, repeatable: recency=x, or tag:<tag>=x to boost
+                      (x > 0) or penalise (x < 0) documents with that tag; a request can override it
   --models-dir <dir>  The model cache (default: <target-dir>/models/)
   --offline           Never download models; fail if they are not cached
   --source-dir <dir>  The knowledge base to serve (required)
@@ -85,12 +89,13 @@ export async function runServe(
     targetDir: values.targetDir,
     modelsDir: values.modelsDir,
     allowRemoteModels: values.offline ? false : undefined,
+    retrieval: values.weights === undefined ? {} : { weights: values.weights },
   };
-  // A rejected setting is the caller's to fix, so it is reported before the port opens or a model loads.
+  // A rejected setting is the caller's to fix, so it is reported before the port opens or a model loads. A weight for a tag no document carries needs the index, so it fails at engine start instead.
   try {
-    loadConfig(input);
+    resolveDefaults(loadConfig(input).retrieval);
   } catch (cause) {
-    if (cause instanceof ConfigError) {
+    if (cause instanceof ConfigError || cause instanceof RetrievalOptionError) {
       return commandFailure(descriptor, "usage", cause);
     }
     throw cause;
@@ -145,6 +150,7 @@ const SERVE_OPTIONS = {
   offline: { type: "boolean" },
   port: { type: "string" },
   host: { type: "string" },
+  weight: { type: "string", multiple: true },
 } as const;
 
 function serveValues({ values }: ParsedFlags<typeof SERVE_OPTIONS>) {
@@ -165,5 +171,9 @@ function serveValues({ values }: ParsedFlags<typeof SERVE_OPTIONS>) {
     offline: values.offline === true,
     port,
     host: values.host ?? DEFAULT_HOST,
+    weights:
+      values.weight === undefined
+        ? undefined
+        : parseNamedNumbers("weight", values.weight),
   };
 }
