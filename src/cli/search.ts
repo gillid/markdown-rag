@@ -37,7 +37,8 @@ Options:
   --min-score <x>     Drop results whose relevance is below x; write a negative
                       value with an equals sign: --min-score=-0.5
   --expand <n>        Neighbouring chunks to add on each side of a hit (maximum ${MAX_EXPAND})
-  --weight <name=x>   Weight of the recency signal, as recency=x
+  --weight <name=x>   Ranking weight, repeatable: recency=x, or tag:<tag>=x to boost
+                      (x > 0) or penalise (x < 0) documents with that tag
   --models-dir <dir>  The model cache (default: <target-dir>/models/)
   --offline           Never download models; fail if they are not cached
 ${COMMON_HELP}

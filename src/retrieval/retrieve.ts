@@ -49,6 +49,11 @@ export function createRetriever(deps: RetrieverDeps) {
     );
   }
 
+  const knownTags = new Set(
+    [...index.documents.values()].flatMap(({ summary }) => summary.tags),
+  );
+  validateWeights(defaults.weights, knownTags);
+
   function documentOf(path: string): IndexedDocument {
     const document = index.documents.get(path);
     if (document === undefined) {
@@ -76,7 +81,7 @@ export function createRetriever(deps: RetrieverDeps) {
       throw new RetrievalOptionError("the query must not be blank");
     }
     validateOptions({ mode, limit, expand, minScore });
-    validateWeights(weights);
+    validateWeights(weights, knownTags);
 
     const vector =
       mode === "keyword" ? undefined : await embedder.embedQuery(request.query);
@@ -100,7 +105,7 @@ export function createRetriever(deps: RetrieverDeps) {
         clock,
         defaults.halfLifeDays,
       );
-      const signals = signalValues(weights, recency);
+      const signals = signalValues(weights, recency, summary.tags);
       const rerank = logits[i] ?? null;
       const relevanceScore = relevance[i] ?? 0;
       const final = blend(relevanceScore, weights, signals);
