@@ -67,7 +67,8 @@ Before reporting work as done, run `pnpm lint:fix`, `pnpm typecheck` and `pnpm t
 | Chunker (structure-aware splitter) | `src/chunking/` |
 | Embedder and reranker | `src/models/` |
 | Orama index and candidate search | `src/index/` |
-| Retrieval pipeline (rerank, recency, cutoff) | `src/retrieval/` |
+| Retrieval pipeline (rerank, recency, tag weights, cutoff) | `src/retrieval/` |
+| Ranking weights (recency, tag boosts and penalties, the 0.5 cap) | `docs/weights.md` |
 | Library API (`createEngine`, `createHttpHandler`, schemas) | `src/engine/` |
 | HTTP handler (`createHttpHandler`), server and `Host`/body checks | `src/http/` |
 | `md-rag serve` | `src/cli/serve.ts` |

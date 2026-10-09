@@ -214,13 +214,22 @@ describe("retrieve", () => {
     ]);
   });
 
-  it("rejects a weight for any signal but recency", async () => {
+  it("rejects a weight for any signal but recency or a tag", async () => {
     await expect(
       retriever(constantReranker())({
         query: "key",
         weights: { authority: 0.1 },
       }),
-    ).rejects.toThrow('the only signal is "recency"');
+    ).rejects.toThrow('the signals are "recency" and "tag:<tag>"');
+  });
+
+  it("rejects a weight for a tag no document carries", async () => {
+    await expect(
+      retriever(constantReranker())({
+        query: "key",
+        weights: { "tag:runbook": 0.1 },
+      }),
+    ).rejects.toThrow('no document has the tag "runbook"');
   });
 
   it("uses the reranker's logits for relevance and ordering", async () => {
@@ -438,5 +447,121 @@ describe("retrieve", () => {
 
   it("requires a reranker while rerank is on", () => {
     expect(() => retriever(undefined, { rerank: true })).toThrow("reranker");
+  });
+});
+
+// Four documents with identical text and date, so only their tags tell them apart.
+describe("retrieve with tag weights", () => {
+  let root: string;
+  let index: KnowledgeIndex;
+
+  const finalsByPath = async (
+    weights: Record<string, number>,
+    defaults: Partial<RetrievalDefaults> = {},
+  ) => {
+    const retrieve = createRetriever({
+      index,
+      embedder: createCountingEmbedder(MODEL),
+      reranker: constantReranker(),
+      defaults,
+      now: () => NOW,
+    });
+    const { results } = await retrieve({
+      query: "gateway signing key",
+      mode: "keyword",
+      limit: 10,
+      weights,
+    });
+    return Object.fromEntries(
+      results.map((r) => [r.summary.path, r.scores.final]),
+    );
+  };
+
+  beforeAll(async () => {
+    root = await mkdtemp(join(tmpdir(), "md-rag-retrieve-tags-"));
+    const docs = join(root, "docs");
+    const updated_at = "2026-09-20";
+    const tagged = (tags: string) => ({ updated_at, tags });
+    await writeDocument(docs, "plain.md", tagged("[]"), KEY_ROTATION);
+    await writeDocument(docs, "runbook.md", tagged("[runbook]"), KEY_ROTATION);
+    await writeDocument(docs, "slack.md", tagged("[slack]"), KEY_ROTATION);
+    await writeDocument(
+      docs,
+      "both.md",
+      tagged("[runbook, slack]"),
+      KEY_ROTATION,
+    );
+    index = await buildTestIndex(docs, join(root, "engine"));
+  });
+
+  afterAll(async () => {
+    await rm(root, { recursive: true, force: true });
+  });
+
+  it("boosts and penalises by tag against hand-computed blends", async () => {
+    // Relevance is sigmoid(0) = 0.5 and the largest tag weight is 0.2, so relevance keeps 0.8.
+    // plain: 0.8 * 0.5 = 0.4; runbook: 0.4 + 0.2 = 0.6; slack: 0.4 - 0.1 = 0.3;
+    // both: the larger magnitude, runbook's +0.2, wins over slack's -0.1, so 0.6.
+    const finals = await finalsByPath({
+      recency: 0,
+      "tag:runbook": 0.2,
+      "tag:slack": -0.1,
+    });
+
+    expect(finals["plain.md"]).toBeCloseTo(0.4, 12);
+    expect(finals["runbook.md"]).toBeCloseTo(0.6, 12);
+    expect(finals["slack.md"]).toBeCloseTo(0.3, 12);
+    expect(finals["both.md"]).toBeCloseTo(0.6, 12);
+  });
+
+  it("ranks a curated page above a chat thread of the same relevance", async () => {
+    const finals = await finalsByPath({
+      recency: 0,
+      "tag:runbook": 0.2,
+      "tag:slack": -0.1,
+    });
+
+    expect(finals["runbook.md"]).toBeGreaterThan(finals["plain.md"] ?? 0);
+    expect(finals["plain.md"]).toBeGreaterThan(finals["slack.md"] ?? 0);
+  });
+
+  it("combines with recency under the shared cap", async () => {
+    // Fresh is 15 days old: recency 0.89089871814. runbook: (1 - 0.1 - 0.2) * 0.5 + 0.1 * 0.89089871814 + 0.2 = 0.639089871814.
+    const finals = await finalsByPath({ recency: 0.1, "tag:runbook": 0.2 });
+
+    expect(finals["runbook.md"]).toBeCloseTo(0.639089871814, 10);
+  });
+
+  it("applies a configured tag weight, which a request can override", async () => {
+    const configured = { weights: { recency: 0, "tag:slack": -0.2 } };
+
+    const byDefault = await finalsByPath({}, configured);
+    const overridden = await finalsByPath({ "tag:slack": -0.1 }, configured);
+
+    expect(byDefault["slack.md"]).toBeCloseTo(0.8 * 0.5 - 0.2, 12);
+    expect(overridden["slack.md"]).toBeCloseTo(0.9 * 0.5 - 0.1, 12);
+  });
+
+  it("counts the default recency weight against the cap unless the request lowers it", async () => {
+    const run = (weights: Record<string, number>) => finalsByPath(weights);
+
+    // Defaults carry recency 0.15, so 0.15 + 0.4 = 0.55.
+    await expect(run({ "tag:runbook": 0.4 })).rejects.toThrow(
+      "recency weight 0.15 (the default; set recency to lower it) plus the largest tag weight by magnitude 0.4",
+    );
+    await expect(
+      run({ recency: 0, "tag:runbook": 0.4 }),
+    ).resolves.toBeDefined();
+  });
+
+  it("refuses to start with a configured weight for a tag no document carries", () => {
+    expect(() =>
+      createRetriever({
+        index,
+        embedder: createCountingEmbedder(MODEL),
+        reranker: constantReranker(),
+        defaults: { weights: { "tag:nosuch": 0.1 } },
+      }),
+    ).toThrow('no document has the tag "nosuch"');
   });
 });

@@ -3,8 +3,10 @@ import { type Filter, filterSchema } from "../index/filter.ts";
 import type { KnowledgeIndex } from "../index/knowledge-index.ts";
 import type { Embedder } from "../models/embedder.ts";
 import type { Reranker } from "../models/reranker.ts";
+import { indexedTags } from "../retrieval/indexed-tags.ts";
 import { resolveDefaults } from "../retrieval/options.ts";
 import { createRetriever } from "../retrieval/retrieve.ts";
+import { validateWeights } from "../retrieval/signals.ts";
 import type { RetrievalDefaults } from "../retrieval/types.ts";
 import type { EngineOptions } from "./engine-options.ts";
 import { ModelsNotLoadedError, parseRequest } from "./errors.ts";
@@ -65,6 +67,7 @@ export async function startEngine(
   const index = await loadIndex(config);
   // Checked even without models, so `loadModels: false` never hides a setting that `search` would reject.
   const defaults = resolveDefaults(config.retrieval);
+  validateWeights(defaults.weights, indexedTags(index));
   const retrieve = loadModels
     ? await startRetriever(config, index, defaults, injected)
     : undefined;

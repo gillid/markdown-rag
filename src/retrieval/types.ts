@@ -8,7 +8,11 @@ import { DEFAULT_HYBRID_WEIGHTS } from "../index/search-candidates.ts";
 import type { SearchMode } from "../index/search-mode.ts";
 import type { Embedder } from "../models/embedder.ts";
 import type { Reranker } from "../models/reranker.ts";
-import { RECENCY, type SignalWeights } from "./signals.ts";
+import {
+  DEFAULT_RECENCY_WEIGHT,
+  RECENCY,
+  type SignalWeights,
+} from "./signals.ts";
 
 export const MIN_LIMIT = 1;
 export const MAX_LIMIT = 10;
@@ -35,7 +39,7 @@ export const DEFAULT_RETRIEVAL: RetrievalDefaults = {
   limit: 3,
   minScore: 0,
   expand: 0,
-  weights: { [RECENCY]: 0.15 },
+  weights: { [RECENCY]: DEFAULT_RECENCY_WEIGHT },
   halfLifeDays: 90,
   hybridWeights: DEFAULT_HYBRID_WEIGHTS,
   rerank: true,

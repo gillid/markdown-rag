@@ -5,6 +5,7 @@ import {
   normaliseScores,
   recencyScore,
   sigmoid,
+  signalValues,
   validateWeights,
 } from "../../src/retrieval/signals.ts";
 
@@ -28,10 +29,18 @@ describe("blend", () => {
     expect(
       blend(
         0.8,
-        { recency: 0.15, authority: 0.2 },
-        { recency: 0.5, authority: 1 },
+        { recency: 0.15, "tag:runbook": 0.2 },
+        { recency: 0.5, tags: 1 },
       ),
     ).toBeCloseTo(0.795, 12);
+  });
+
+  it("subtracts a penalty and still gives relevance 1 minus the largest tag weight", () => {
+    // 0.9 * 0.8 + 0.1 * -1
+    expect(blend(0.8, { "tag:slack": -0.1 }, { tags: -1 })).toBeCloseTo(
+      0.62,
+      12,
+    );
   });
 
   it("is the relevance alone with no weights", () => {
@@ -39,10 +48,73 @@ describe("blend", () => {
   });
 });
 
+describe("signalValues", () => {
+  const weights = { recency: 0.1, "tag:runbook": 0.2, "tag:slack": -0.1 };
+
+  it("scales the largest matching tag weight by the largest weight, so tags is in [-1, 1]", () => {
+    expect(signalValues(weights, 0.5, ["runbook"])).toEqual({
+      recency: 0.5,
+      tags: 1,
+    });
+    expect(signalValues(weights, 0.5, ["slack"])).toEqual({
+      recency: 0.5,
+      tags: -0.5,
+    });
+  });
+
+  it("takes the matching tag of the largest magnitude, not the sum", () => {
+    expect(signalValues(weights, 0.5, ["slack", "runbook"]).tags).toBe(1);
+  });
+
+  it("lets a penalty win a tie of magnitudes", () => {
+    const tied = { "tag:a": 0.1, "tag:b": -0.1 };
+
+    expect(signalValues(tied, 0, ["a", "b"]).tags).toBe(-1);
+  });
+
+  it("is 0 for a document with none of the weighted tags, and absent without tag weights", () => {
+    expect(signalValues(weights, 0.5, ["other"]).tags).toBe(0);
+    expect(signalValues({ recency: 0.1 }, 0.5, ["runbook"])).toEqual({
+      recency: 0.5,
+    });
+  });
+});
+
 describe("validateWeights", () => {
+  const known = new Set(["runbook", "slack"]);
+
   it("accepts recency up to exactly 0.5, and no weights at all", () => {
     expect(() => validateWeights({ recency: 0.5 })).not.toThrow();
     expect(() => validateWeights({})).not.toThrow();
+  });
+
+  it.each([
+    [0.1, 0.4],
+    [0.2, 0.3],
+    [0.15, 0.35],
+    [0.05, 0.45],
+  ])(
+    "accepts recency %s with a tag weight %s, which total exactly 0.5",
+    (recency, tag) => {
+      expect(() =>
+        validateWeights({ recency, "tag:runbook": tag }),
+      ).not.toThrow();
+    },
+  );
+
+  it("accepts signed tag weights for tags that exist", () => {
+    expect(() =>
+      validateWeights({ "tag:runbook": 0.3, "tag:slack": -0.4 }, known),
+    ).not.toThrow();
+  });
+
+  it("caps recency plus the largest tag weight by magnitude, not the sum of tag weights", () => {
+    expect(() =>
+      validateWeights({ recency: 0.2, "tag:runbook": 0.3 }),
+    ).not.toThrow();
+    expect(() =>
+      validateWeights({ "tag:runbook": 0.5, "tag:slack": -0.5 }),
+    ).not.toThrow();
   });
 
   it.each([
@@ -50,9 +122,31 @@ describe("validateWeights", () => {
     [{ recency: 1.5 }, "[0, 1]"],
     [{ recency: Number.NaN }, "[0, 1]"],
     [{ recency: 0.6 }, "at most 0.5"],
-    [{ authority: 0.1 }, 'the only signal is "recency"'],
+    [{ "tag:runbook": -1.5 }, "[-1, 1]"],
+    [{ "tag:slack": -0.6 }, "at most 0.5"],
+    [{ recency: 0.3, "tag:runbook": 0.3 }, "at most 0.5"],
+    [{ authority: 0.1 }, 'the signals are "recency" and "tag:<tag>"'],
+    [{ "tag:": 0.1 }, 'the signals are "recency" and "tag:<tag>"'],
   ])("rejects %j", (weights, message) => {
     expect(() => validateWeights(weights)).toThrow(message);
+  });
+
+  it("hints at the default recency weight only when it is the one in use", () => {
+    expect(() =>
+      validateWeights({ recency: 0.15, "tag:runbook": 0.4 }),
+    ).toThrow("the default; set recency to lower it");
+    expect(() => validateWeights({ recency: 0.6 })).toThrow(
+      /recency weight 0\.6 plus/,
+    );
+    expect(() => validateWeights({ recency: 0.3, "tag:runbook": 0.3 })).toThrow(
+      /recency weight 0\.3 plus/,
+    );
+  });
+
+  it("rejects a weight for a tag no document carries, when the tags are known", () => {
+    expect(() => validateWeights({ "tag:runbok": 0.1 }, known)).toThrow(
+      'no document has the tag "runbok"',
+    );
   });
 });
 
