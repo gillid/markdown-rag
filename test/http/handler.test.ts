@@ -15,7 +15,7 @@ import {
   writeMarkdown,
 } from "../support/engine-fixtures.ts";
 
-const scratch = scratchKnowledgeBases("md-rag-http-");
+const scratch = scratchKnowledgeBases("markdown-rag-http-");
 
 interface Served {
   url: string;
@@ -349,7 +349,7 @@ describe("HTTP handler", () => {
         });
         await new Promise((resolve) => setTimeout(resolve, 50));
 
-        expect(server.logs).toEqual(["md-rag: ready"]);
+        expect(server.logs).toEqual(["markdown-rag: ready"]);
       } finally {
         await server.close();
       }

@@ -6,7 +6,7 @@ An open-source engine that serves a Git repository of Markdown files to AI agent
 
 - **Runtime:** Node.js 24 LTS, ESM. TypeScript runs directly through native type stripping (no build step in development), with `tsc --noEmit` for type-checking only. Use erasable syntax only: no `enum`, no `namespace`, no parameter properties. Sidecar vectors use Node 24's native `DataView` float16 methods (ADR-033), so the `tsconfig.json` `lib` includes `ESNext.Float16`.
 - **Package manager:** pnpm
-- **Distribution:** one npm package, `markdown-rag`, whose binary is `md-rag`. `tsc` emits JS and `.d.ts` into `dist/` only at pack time (`prepack`, ADR-030); `publishConfig` points `bin` and `exports` at `dist/`, while in the repo they point at the `.ts` sources. Merging to `main` a `package.json` whose `version` isn't on npm yet publishes it and tags `v<version>` through `.github/workflows/publish.yml` (npm trusted publishing, ADR-043).
+- **Distribution:** one npm package, `markdown-rag`, whose binary is `markdown-rag`. `tsc` emits JS and `.d.ts` into `dist/` only at pack time (`prepack`, ADR-030); `publishConfig` points `bin` and `exports` at `dist/`, while in the repo they point at the `.ts` sources. Merging to `main` a `package.json` whose `version` isn't on npm yet publishes it and tags `v<version>` through `.github/workflows/publish.yml` (npm trusted publishing, ADR-043).
 - **Search:** `@orama/orama` (in-process hybrid index) with `@orama/stopwords` for the English BM25 stopword list
 - **Query-path models (local):** `@huggingface/transformers` on `onnxruntime-node`. The embedder is `Xenova/bge-small-en-v1.5` and the reranker is `Xenova/ms-marco-MiniLM-L-6-v2` (q8).
 - **Parsing and validation:** `mdast-util-from-markdown`, `mdast-util-frontmatter`, `mdast-util-gfm-table` (tables are parsed as tables), `mdast-util-to-string`, `yaml`, `zod`
@@ -20,8 +20,8 @@ Keep this list in sync with `package.json`.
 | Command | Purpose |
 | --- | --- |
 | `pnpm install` | Install dependencies |
-| `pnpm md-rag <cmd>` | Run the CLI: `embed`, `check`, `overview`, `search`, `list`, `get`, `serve`, `eval` |
-| `pnpm start` | `md-rag serve` (HTTP API) with the configured storage |
+| `pnpm markdown-rag <cmd>` | Run the CLI: `embed`, `check`, `overview`, `search`, `list`, `get`, `serve`, `eval` |
+| `pnpm start` | `markdown-rag serve` (HTTP API) with the configured storage |
 | `pnpm lint` / `pnpm lint:fix` | Biome check / apply fixes and formatting |
 | `pnpm typecheck` | `tsc --noEmit` |
 | `pnpm test` | Unit tests; no model downloads and no LLM calls |
@@ -38,9 +38,9 @@ Before reporting work as done, run `pnpm lint:fix`, `pnpm typecheck` and `pnpm t
 - **Every behaviour change is checked against its ADR.** If a change contradicts a decision in `docs/design.md` §4, update or supersede that ADR in the same PR.
 - **One step, one PR.** Work follows `docs/implementation.md`. Set the step's status (`planned` → `in-progress` → `done`) in the same PR.
 - **Sidecars are the contract between the write path and the read path.** A sidecar is fresh if and only if its `doc_hash` matches its document, its chunker ID and embedding model match the ones all sidecars share, its vectors decode, and its chunks match the document text (ADR-006, ADR-039). Sidecar output must be byte-stable. Stale sidecars must fail fast and must never be patched over at runtime.
-- **Engine-owned files live only in `targetDir`** (default `<sourceDir>/.md-rag/`: sidecars and model cache). Every file in it is generated; never add a hand-edited one, and never write anywhere else in a knowledge base (ADR-031, ADR-037).
+- **Engine-owned files live only in `targetDir`** (default `<sourceDir>/.markdown-rag/`: sidecars and model cache). Every file in it is generated; never add a hand-edited one, and never write anywhere else in a knowledge base (ADR-031, ADR-037).
 - **A release is a `version` bump merged to `main`.** Never push a tag by hand and never bump `version` unless the PR is meant to ship (ADR-043).
-- **Sidecars are never committed.** The whole engine folder is git-ignored, and `md-rag embed` regenerates it before serving; tests generate sidecars into a temporary `targetDir` (ADR-038).
+- **Sidecars are never committed.** The whole engine folder is git-ignored, and `markdown-rag embed` regenerates it before serving; tests generate sidecars into a temporary `targetDir` (ADR-038).
 - **No environment variables.** Configuration arrives only through CLI flags or the object passed to `createEngine`; there is no config file. The embedding model comes from the sidecars (ADR-032).
 - **Neither path makes network calls.** The only network access is downloading model weights into the cache.
 - **The library API is the extension point.** Advanced layers compose on `createEngine()`. Don't add plugin or hook systems.
@@ -55,7 +55,7 @@ Before reporting work as done, run `pnpm lint:fix`, `pnpm typecheck` and `pnpm t
 | Step-by-step PoC plan with statuses | `docs/implementation.md` |
 | PR review checklist (used by the automated review routine) | `REVIEW.md` |
 | Document contract and sidecar format (for exporters) | `docs/contract.md` (planned, step 24) |
-| Agent setup prompt | `docs/agent-setup.md` (planned, step 20) |
+| Agent setup note, and the working guide that ships in the package | `docs/agent-setup.md`, `docs/agent-guide.md` |
 | Benchmark and chunker comparison | `docs/benchmarks.md` (planned, steps 22–23) |
 | Sample knowledge base and golden queries | `examples/docs/`, `examples/eval/` (planned, steps 3, 21) |
 | CLI entry and subcommands | `src/cli/` |
@@ -63,7 +63,7 @@ Before reporting work as done, run `pnpm lint:fix`, `pnpm typecheck` and `pnpm t
 | Release workflow (a new `version` merged to `main` publishes to npm and tags it) | `.github/workflows/publish.yml` |
 | Runtime config | `src/config/` |
 | Storage loading and contract validation | `src/contract/` |
-| Sidecar format, freshness, `md-rag embed` | `src/sidecars/` |
+| Sidecar format, freshness, `markdown-rag embed` | `src/sidecars/` |
 | Chunker (structure-aware splitter) | `src/chunking/` |
 | Embedder and reranker | `src/models/` |
 | Orama index and candidate search | `src/index/` |
@@ -71,7 +71,7 @@ Before reporting work as done, run `pnpm lint:fix`, `pnpm typecheck` and `pnpm t
 | Ranking weights (recency, tag boosts and penalties, the 0.5 cap) | `docs/weights.md` |
 | Library API (`createEngine`, `createHttpHandler`, schemas) | `src/engine/` |
 | HTTP handler (`createHttpHandler`), server and `Host`/body checks | `src/http/` |
-| `md-rag serve` | `src/cli/serve.ts` |
+| `markdown-rag serve` | `src/cli/serve.ts` |
 | Eval and benchmarks | `src/eval/` |
 | Orama docs | https://docs.orama.com |
 | transformers.js docs | https://huggingface.co/docs/transformers.js |

@@ -37,7 +37,7 @@ export const COMMON_OPTIONS = {
 type CommonFlagsAbsent = Partial<Record<keyof typeof COMMON_OPTIONS, never>>;
 
 export const COMMON_HELP = `  --source-dir <dir>  The knowledge base to query (required)
-  --target-dir <dir>  The engine folder (default: <source-dir>/.md-rag/)
+  --target-dir <dir>  The engine folder (default: <source-dir>/.markdown-rag/)
   --json              Print JSON instead of Markdown; a failure is a JSON error on stderr
   -h, --help          Show this help message
 `;

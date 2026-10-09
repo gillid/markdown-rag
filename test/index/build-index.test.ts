@@ -26,7 +26,7 @@ describe("buildIndex", () => {
   let targetDir: string;
 
   beforeEach(async () => {
-    root = await mkdtemp(join(tmpdir(), "md-rag-index-"));
+    root = await mkdtemp(join(tmpdir(), "markdown-rag-index-"));
     sourceDir = join(root, "kb");
     targetDir = join(root, "engine");
   });

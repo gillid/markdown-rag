@@ -59,7 +59,7 @@ describe("retrieve over examples/docs", () => {
   let retrieve: ReturnType<typeof createRetriever>;
 
   beforeAll(async () => {
-    root = await mkdtemp(join(tmpdir(), "md-rag-retrieve-examples-"));
+    root = await mkdtemp(join(tmpdir(), "markdown-rag-retrieve-examples-"));
     retrieve = createRetriever({
       index: await buildTestIndex(EXAMPLES, join(root, "engine")),
       embedder: createCountingEmbedder(MODEL),
@@ -124,7 +124,7 @@ describe("retrieve", () => {
     });
 
   beforeAll(async () => {
-    root = await mkdtemp(join(tmpdir(), "md-rag-retrieve-"));
+    root = await mkdtemp(join(tmpdir(), "markdown-rag-retrieve-"));
     const docs = join(root, "docs");
     await writeDocument(
       docs,
@@ -478,7 +478,7 @@ describe("retrieve with tag weights", () => {
   };
 
   beforeAll(async () => {
-    root = await mkdtemp(join(tmpdir(), "md-rag-retrieve-tags-"));
+    root = await mkdtemp(join(tmpdir(), "markdown-rag-retrieve-tags-"));
     const docs = join(root, "docs");
     const updated_at = "2026-09-20";
     const tagged = (tags: string) => ({ updated_at, tags });

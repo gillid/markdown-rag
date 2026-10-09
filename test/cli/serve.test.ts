@@ -31,12 +31,12 @@ function deps(overrides: Partial<ServeDeps> = {}): ServeDeps & {
   };
 }
 
-describe("md-rag serve", () => {
+describe("markdown-rag serve", () => {
   it("prints help even next to a bad port", async () => {
     const result = await runServe(["--port", "abc", "--help"], deps());
 
     expect(result.exitCode).toBe(0);
-    expect(result.stdout).toContain("Usage: md-rag serve");
+    expect(result.stdout).toContain("Usage: markdown-rag serve");
   });
 
   it("reports an unknown flag and a repeated flag as usage failures", async () => {
@@ -48,9 +48,9 @@ describe("md-rag serve", () => {
 
     expect(unknown.exitCode).toBe(1);
     expect(unknown.stderr).toMatch(/^serve: Unknown option '--bogus'/);
-    expect(unknown.stderr).toContain("Usage: md-rag serve");
+    expect(unknown.stderr).toContain("Usage: markdown-rag serve");
     expect(repeated.stderr).toMatch(
-      /^serve: --source-dir was given more than once\n\nUsage: md-rag serve/,
+      /^serve: --source-dir was given more than once\n\nUsage: markdown-rag serve/,
     );
   });
 

@@ -30,7 +30,7 @@ describe("embedKnowledgeBase", () => {
   let targetDir: string;
 
   beforeEach(async () => {
-    root = await mkdtemp(join(tmpdir(), "md-rag-embed-"));
+    root = await mkdtemp(join(tmpdir(), "markdown-rag-embed-"));
     sourceDir = join(root, "kb");
     targetDir = join(root, "engine");
   });
@@ -467,7 +467,7 @@ describe("embedKnowledgeBase", () => {
 });
 
 function isCaseInsensitiveFileSystem(): boolean {
-  const dir = mkdtempSync(join(tmpdir(), "md-rag-case-"));
+  const dir = mkdtempSync(join(tmpdir(), "markdown-rag-case-"));
   try {
     writeFileSync(join(dir, "A"), "");
     return existsSync(join(dir, "a"));

@@ -263,7 +263,7 @@ describe("sidecar store", () => {
   let targetDir: string;
 
   beforeEach(async () => {
-    targetDir = await mkdtemp(join(tmpdir(), "md-rag-sidecar-"));
+    targetDir = await mkdtemp(join(tmpdir(), "markdown-rag-sidecar-"));
   });
 
   afterEach(async () => {

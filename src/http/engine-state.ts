@@ -15,11 +15,11 @@ export function trackEngine(
   engine.then(
     (ready) => {
       state = { status: "ready", engine: ready };
-      log("md-rag: ready");
+      log("markdown-rag: ready");
     },
     (cause: unknown) => {
       state = { status: "failed", cause };
-      log(`md-rag: the engine failed to start: ${errorMessage(cause)}`);
+      log(`markdown-rag: the engine failed to start: ${errorMessage(cause)}`);
     },
   );
   return () => state;

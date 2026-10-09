@@ -18,7 +18,7 @@ import {
 } from "../support/engine-fixtures.ts";
 
 describe("engine startup", () => {
-  const kbs = scratchKnowledgeBases("md-rag-engine-startup-");
+  const kbs = scratchKnowledgeBases("markdown-rag-engine-startup-");
   const freshKnowledgeBase = kbs.fresh;
   it("refuses to start with a default weight for an unknown signal", async () => {
     const dir = await freshKnowledgeBase("weights");
@@ -29,7 +29,7 @@ describe("engine startup", () => {
     ).rejects.toThrow(/authority/);
   });
 
-  it("refuses to start without sidecars, naming md-rag embed", async () => {
+  it("refuses to start without sidecars, naming markdown-rag embed", async () => {
     const dir = await freshKnowledgeBase("unembedded");
     await writeMarkdown(dir, "a.md", frontmatter(), "Alpha.");
 
@@ -38,7 +38,7 @@ describe("engine startup", () => {
         sourceDir: dir,
         targetDir: join(kbs.workDir("unembedded"), "engine"),
       }),
-    ).rejects.toThrow(/md-rag embed/);
+    ).rejects.toThrow(/markdown-rag embed/);
   });
 
   it("refuses to start once a document has changed since it was embedded", async () => {

@@ -9,7 +9,7 @@ import {
   runQuery,
 } from "./run-query.ts";
 
-export const GET_HELP = `Usage: md-rag get <ref> --source-dir <dir> [options]
+export const GET_HELP = `Usage: markdown-rag get <ref> --source-dir <dir> [options]
 
 Prints one document: its summary, its outline (headings with their anchors)
 and its body. <ref> is a document path, or <path>#<anchor> for one section;

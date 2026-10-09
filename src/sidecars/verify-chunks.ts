@@ -15,7 +15,7 @@ export function verifySidecars(
       if (!(cause instanceof SidecarError)) throw cause;
       problems.push({
         path: document.path,
-        reason: `invalid sidecar: ${errorMessage(cause)}; run md-rag embed`,
+        reason: `invalid sidecar: ${errorMessage(cause)}; run markdown-rag embed`,
       });
     }
   }

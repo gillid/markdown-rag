@@ -21,7 +21,7 @@ describe("searchCandidates with the real embedder", () => {
   let index: KnowledgeIndex;
 
   beforeAll(async () => {
-    root = await mkdtemp(join(tmpdir(), "md-rag-candidates-models-"));
+    root = await mkdtemp(join(tmpdir(), "markdown-rag-candidates-models-"));
     const targetDir = join(root, "engine");
     embedder = createTransformersEmbedder(
       loadConfig({

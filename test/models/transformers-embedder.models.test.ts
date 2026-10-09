@@ -39,7 +39,7 @@ describe("transformers embedder", () => {
   }
 
   beforeAll(async () => {
-    root = await mkdtemp(join(tmpdir(), "md-rag-embedder-"));
+    root = await mkdtemp(join(tmpdir(), "markdown-rag-embedder-"));
     sharedModelsDir = join(root, "shared-models");
   });
 

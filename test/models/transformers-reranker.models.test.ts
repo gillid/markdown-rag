@@ -26,7 +26,7 @@ describe("transformers reranker", () => {
   }
 
   beforeAll(async () => {
-    root = await mkdtemp(join(tmpdir(), "md-rag-reranker-"));
+    root = await mkdtemp(join(tmpdir(), "markdown-rag-reranker-"));
   });
 
   afterAll(async () => {

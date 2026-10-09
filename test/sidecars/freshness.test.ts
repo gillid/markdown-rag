@@ -67,12 +67,12 @@ describe("checkFreshness", () => {
         {
           path: "a.md",
           reason:
-            "sidecars record different chunkers (structural@2;target=1000;max=2000, structural@2;target=500;max=1000) and this one has structural@2;target=1000;max=2000; run md-rag embed",
+            "sidecars record different chunkers (structural@2;target=1000;max=2000, structural@2;target=500;max=1000) and this one has structural@2;target=1000;max=2000; run markdown-rag embed",
         },
         {
           path: "b.md",
           reason:
-            "sidecars record different chunkers (structural@2;target=1000;max=2000, structural@2;target=500;max=1000) and this one has structural@2;target=500;max=1000; run md-rag embed",
+            "sidecars record different chunkers (structural@2;target=1000;max=2000, structural@2;target=500;max=1000) and this one has structural@2;target=500;max=1000; run markdown-rag embed",
         },
       ],
     });
@@ -86,7 +86,9 @@ describe("checkFreshness", () => {
 
     expect(result).toEqual({
       ok: false,
-      problems: [{ path: "b.md", reason: "sidecar missing; run md-rag embed" }],
+      problems: [
+        { path: "b.md", reason: "sidecar missing; run markdown-rag embed" },
+      ],
     });
   });
 
@@ -102,7 +104,7 @@ describe("checkFreshness", () => {
         {
           path: "a.md",
           reason:
-            "stale sidecar: its doc_hash does not match the document; run md-rag embed",
+            "stale sidecar: its doc_hash does not match the document; run markdown-rag embed",
         },
       ],
     });
@@ -154,11 +156,11 @@ describe("checkFreshness", () => {
       problems: [
         {
           path: "a.md",
-          reason: `sidecars record different models (${MODEL}, new-model) and this one has new-model; run md-rag embed`,
+          reason: `sidecars record different models (${MODEL}, new-model) and this one has new-model; run markdown-rag embed`,
         },
         {
           path: "b.md",
-          reason: `sidecars record different models (${MODEL}, new-model) and this one has ${MODEL}; run md-rag embed`,
+          reason: `sidecars record different models (${MODEL}, new-model) and this one has ${MODEL}; run markdown-rag embed`,
         },
       ],
     });
@@ -178,7 +180,7 @@ describe("checkFreshness", () => {
       problems: [
         {
           path: "a.md",
-          reason: `stale sidecar: its doc_hash does not match the document and was built with model old-model, not ${MODEL}; run md-rag embed`,
+          reason: `stale sidecar: its doc_hash does not match the document and was built with model old-model, not ${MODEL}; run markdown-rag embed`,
         },
       ],
     });
@@ -252,7 +254,7 @@ describe("checkFreshness", () => {
         {
           path: "a.md",
           reason:
-            "the engine has no preset for the recorded model unknown-model; run md-rag embed to re-embed with the engine's model",
+            "the engine has no preset for the recorded model unknown-model; run markdown-rag embed to re-embed with the engine's model",
         },
       ],
     });
@@ -269,7 +271,7 @@ describe("checkFreshness", () => {
       problems: [
         {
           path: "a.md",
-          reason: `sidecar vectors have 8 dims, but model ${MODEL} has 384; run md-rag embed`,
+          reason: `sidecar vectors have 8 dims, but model ${MODEL} has 384; run markdown-rag embed`,
         },
       ],
     });
@@ -289,7 +291,7 @@ describe("checkFreshness", () => {
       problems: [
         {
           path: "a.md",
-          reason: "invalid sidecar: invalid JSON; run md-rag embed",
+          reason: "invalid sidecar: invalid JSON; run markdown-rag embed",
         },
       ],
     });

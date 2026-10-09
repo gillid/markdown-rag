@@ -1,6 +1,6 @@
 # REVIEW.md
 
-Checklist for automated and human PR review of md-rag. Rules here are drawn from `CLAUDE.md` and the ADR log in `docs/design.md` §4 — this file doesn't invent new rules, it makes the existing non-negotiables checkable against a diff. If a rule here and the source doc ever disagree, the source doc wins and this file is stale.
+Checklist for automated and human PR review of markdown-rag. Rules here are drawn from `CLAUDE.md` and the ADR log in `docs/design.md` §4 — this file doesn't invent new rules, it makes the existing non-negotiables checkable against a diff. If a rule here and the source doc ever disagree, the source doc wins and this file is stale.
 
 ## Non-negotiable rules
 
@@ -15,8 +15,8 @@ Checklist for automated and human PR review of md-rag. Rules here are drawn from
 
 - **Freshness rule.** A sidecar is fresh iff its `doc_hash` matches its document and its embedding model matches the one all sidecars share (ADR-006, ADR-032). Nothing should patch a stale sidecar at runtime or make the read path tolerate staleness — it must fail fast.
 - **Byte-stable output.** Sidecar writers must produce byte-stable output for unchanged input (ADR-005, ADR-038) — no timestamps, non-deterministic key ordering, or other churn baked into sidecar content.
-- **Engine-owned files stay in `targetDir`.** Nothing the engine writes may land outside `targetDir` (default `<sourceDir>/.md-rag/`), and nothing in `targetDir` should be hand-edited or assumed pre-existing (ADR-031, ADR-037).
-- **Sidecars are never committed.** No change should commit anything under the engine folder, remove it from `.gitignore`, or make `md-rag embed` optional before serving (ADR-038).
+- **Engine-owned files stay in `targetDir`.** Nothing the engine writes may land outside `targetDir` (default `<sourceDir>/.markdown-rag/`), and nothing in `targetDir` should be hand-edited or assumed pre-existing (ADR-031, ADR-037).
+- **Sidecars are never committed.** No change should commit anything under the engine folder, remove it from `.gitignore`, or make `markdown-rag embed` optional before serving (ADR-038).
 - **Paths and hashing.** Document identity is a POSIX path relative to the knowledge base root; line endings are normalized to LF before hashing or computing offsets (ADR-004, ADR-005). Flag any path handling that uses OS-native separators or hashes un-normalized content.
 
 ### Configuration and boundaries

@@ -14,7 +14,7 @@ npx markdown-rag embed --source-dir ./docs
 npx markdown-rag search "how do I roll back a bad deploy?" --source-dir ./docs
 ```
 
-`embed` writes its generated files to `./docs/.md-rag/`. Git-ignore that folder and re-run `embed` whenever the Markdown changes; only changed documents are processed again.
+`embed` writes its generated files to `./docs/.markdown-rag/`. Git-ignore that folder and re-run `embed` whenever the Markdown changes; only changed documents are processed again.
 
 ## Your documents
 
@@ -91,7 +91,7 @@ Results are ordered by relevance, and you can nudge the order toward newer docum
 
 ## Using it from an agent
 
-Tell your agent to run `overview` first, filter with what it learned, then `search` or `list`, then `get` to read the full text.
+Tell your agent to run `overview` first, filter with what it learned, then `search` or `list`, then `get` to read the full text. [docs/agent-setup.md](docs/agent-setup.md) has a short note to paste into its instructions, and the package ships a working guide for it to read, `docs/agent-guide.md`.
 
 ## License
 

@@ -1,7 +1,6 @@
 # Ranking weights
 
-Weights let you reorder search results using more than relevance: newer documents can rank higher, a curated page can outrank a chat thread, and a noisy source can be pushed down. The decision record is ADR-034 and ADR-045 in [design.md](design.md).
-
+Weights let you reorder search results using more than relevance: newer documents can rank higher, a curated page can outrank a chat thread, and a noisy source can be pushed down.
 ## How a result is scored
 
 Every search result starts with a **relevance** score: how well the chunk answers the query, as judged by the local reranker. Weights then add nudges on top. There are two kinds:
@@ -29,7 +28,7 @@ Weights are a map from a name to a number:
 | `recency` | 0 to 1 | Bonus for newer documents. Defaults to `0.15`. |
 | `tag:<tag>` | -1 to 1 | Boost (positive) or penalty (negative) for documents with that tag. |
 
-Any other name is an error. So is a `tag:<tag>` weight for a tag that no indexed document carries, so a typo fails loudly instead of silently ranking nothing. `md-rag overview` lists the tags that exist.
+Any other name is an error. So is a `tag:<tag>` weight for a tag that no indexed document carries, so a typo fails loudly instead of silently ranking nothing. `markdown-rag overview` lists the tags that exist.
 
 Two consequences to know about:
 
@@ -54,7 +53,7 @@ npx markdown-rag search "rotate signing keys" --source-dir ./docs \
   --weight recency=0.1 --weight tag:runbook=0.2 --weight tag:slack=-0.1
 ```
 
-The CLI splits `--weight` at the first `=`, so it cannot weight a tag whose name contains `=`; set such a weight through HTTP or the library. `md-rag serve` takes the same repeatable `--weight` flag for the deployment's defaults. Over HTTP, send the same map as `weights` in the `POST /search` body to override them for one request. Setting a weight to `0` switches that nudge off; `recency: 0` turns recency off.
+The CLI splits `--weight` at the first `=`, so it cannot weight a tag whose name contains `=`; set such a weight through HTTP or the library. `markdown-rag serve` takes the same repeatable `--weight` flag for the deployment's defaults. Over HTTP, send the same map as `weights` in the `POST /search` body to override them for one request. Setting a weight to `0` switches that nudge off; `recency: 0` turns recency off.
 
 ## How tags combine
 

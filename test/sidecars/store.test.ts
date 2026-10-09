@@ -19,7 +19,7 @@ describe("sidecar store housekeeping", () => {
   let targetDir: string;
 
   beforeEach(async () => {
-    targetDir = await mkdtemp(join(tmpdir(), "md-rag-store-"));
+    targetDir = await mkdtemp(join(tmpdir(), "markdown-rag-store-"));
   });
 
   afterEach(async () => {

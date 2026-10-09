@@ -15,7 +15,7 @@ import {
   writeMarkdown,
 } from "../support/engine-fixtures.ts";
 
-const scratch = scratchKnowledgeBases("md-rag-query-cli-");
+const scratch = scratchKnowledgeBases("markdown-rag-query-cli-");
 
 interface Started {
   input: unknown;
@@ -265,7 +265,7 @@ describe("query commands", () => {
 
         expect(result.exitCode).toBe(1);
         expect(result.stderr).toContain(field);
-        expect(result.stderr).toContain("Usage: md-rag search");
+        expect(result.stderr).toContain("Usage: markdown-rag search");
         expect(started).toEqual([]);
       },
     );
@@ -301,7 +301,7 @@ describe("query commands", () => {
 
       for (const result of [mode, weight, query]) {
         expect(result.exitCode).toBe(1);
-        expect(result.stderr).toContain("Usage: md-rag search");
+        expect(result.stderr).toContain("Usage: markdown-rag search");
       }
       expect(mode.stderr).toContain(
         "--mode must be one of hybrid, keyword, semantic",
@@ -322,7 +322,7 @@ describe("query commands", () => {
       const result = await runCommand(["--help"], fakeDeps());
 
       expect(result.exitCode).toBe(0);
-      expect(result.stdout).toContain(`Usage: md-rag ${name}`);
+      expect(result.stdout).toContain(`Usage: markdown-rag ${name}`);
     });
 
     it("requires --source-dir", async () => {
@@ -336,7 +336,7 @@ describe("query commands", () => {
       const result = await runCommand(["--bogus", ...flags], fakeDeps());
 
       expect(result.exitCode).toBe(1);
-      expect(result.stderr).toContain(`Usage: md-rag ${name}`);
+      expect(result.stderr).toContain(`Usage: markdown-rag ${name}`);
     });
   });
 
@@ -431,7 +431,7 @@ describe("query commands", () => {
       );
 
       expect(result.exitCode).toBe(1);
-      expect(result.stderr).toContain("Usage: md-rag list");
+      expect(result.stderr).toContain("Usage: markdown-rag list");
     });
 
     it("reports a missing document as not_found", async () => {
@@ -513,7 +513,7 @@ describe("query commands", () => {
       const result = await runCommand(args, fakeDeps());
 
       expect(result.exitCode).toBe(0);
-      expect(result.stdout).toContain(`Usage: md-rag ${name}`);
+      expect(result.stdout).toContain(`Usage: markdown-rag ${name}`);
     },
   );
 
@@ -538,7 +538,7 @@ describe("query commands", () => {
     );
 
     expect(result.exitCode).toBe(0);
-    expect(result.stdout).toContain("Usage: md-rag list");
+    expect(result.stdout).toContain("Usage: markdown-rag list");
   });
 
   it("rejects negated flags other than --no-body", async () => {
@@ -554,7 +554,7 @@ describe("query commands", () => {
 
     for (const result of [noJson, noHelp, body]) {
       expect(result.exitCode).toBe(1);
-      expect(result.stderr).toContain("Usage: md-rag get");
+      expect(result.stderr).toContain("Usage: markdown-rag get");
     }
   });
 
@@ -566,7 +566,7 @@ describe("query commands", () => {
 
     expect(result.exitCode).toBe(1);
     expect(result.stderr).toContain('--weight cannot name "__proto__"');
-    expect(result.stderr).toContain("Usage: md-rag search");
+    expect(result.stderr).toContain("Usage: markdown-rag search");
   });
 
   it("reads a negative number written with an equals sign", async () => {
