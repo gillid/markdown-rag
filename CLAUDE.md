@@ -56,7 +56,7 @@ Before reporting work as done, run `pnpm lint:fix`, `pnpm typecheck` and `pnpm t
 | PR review checklist (used by the automated review routine) | `REVIEW.md` |
 | Document contract and sidecar format (for exporters) | `docs/contract.md` (planned, step 21) |
 | Agent setup note, and the working guide that ships in the package | `docs/agent-setup.md`, `docs/agent-guide.md` |
-| Benchmark and chunker comparison | `docs/benchmarks.md` (planned, steps 23 and 25) |
+| Eval baseline that gates retrieval quality | `examples/eval/baseline.json` (planned, step 24) |
 | Sample knowledge base and golden queries | `examples/docs/`, `examples/eval/` (planned, steps 3, 22) |
 | CLI entry and subcommands | `src/cli/` |
 | Pack-time emit config and the packed-tarball smoke test | `tsconfig.build.json`, `scripts/pack-smoke.ts` |
