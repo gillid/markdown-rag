@@ -13,8 +13,8 @@ function input(title: string, body: string): ChunkerInput {
   return { title, body: parsed.body, tree: parsed.tree };
 }
 
-async function chunkTexts(doc: ChunkerInput, targetChars?: number) {
-  const spans = await createStructuralChunker({ targetChars }).chunk(doc);
+async function chunkTexts(doc: ChunkerInput, maxChars?: number) {
+  const spans = await createStructuralChunker({ maxChars }).chunk(doc);
   return spans.map((span) => ({
     ...span,
     text: doc.body.slice(span.start, span.end),
@@ -45,11 +45,9 @@ const SAMPLE = [
 
 describe("createStructuralChunker", () => {
   it("identifies itself for the sidecar", () => {
-    expect(createStructuralChunker().id).toBe(
-      "structural@1;target=1000;max=2000",
-    );
-    expect(createStructuralChunker({ targetChars: 40, maxChars: 90 }).id).toBe(
-      "structural@1;target=40;max=90",
+    expect(createStructuralChunker().id).toBe("structural@2;max=1000");
+    expect(createStructuralChunker({ maxChars: 90 }).id).toBe(
+      "structural@2;max=90",
     );
   });
 
@@ -204,10 +202,7 @@ describe("createStructuralChunker", () => {
       "Doc",
       "\nOne is here. Two is here. Three is here. Four is here.\n",
     );
-    const spans = await createStructuralChunker({
-      targetChars: 30,
-      maxChars: 40,
-    }).chunk(doc);
+    const spans = await createStructuralChunker({ maxChars: 30 }).chunk(doc);
     expect(
       spans.map((span) => doc.body.slice(span.start, span.end).trim()),
     ).toEqual(["One is here. Two is here.", "Three is here. Four is here."]);
@@ -218,13 +213,60 @@ describe("createStructuralChunker", () => {
       "Doc",
       "\n- alpha alpha\n- beta beta\n- gamma gamma\n- delta delta\n",
     );
-    const spans = await createStructuralChunker({
-      targetChars: 30,
-      maxChars: 40,
-    }).chunk(doc);
+    const spans = await createStructuralChunker({ maxChars: 30 }).chunk(doc);
     expect(
       spans.map((span) => doc.body.slice(span.start, span.end).trim()),
     ).toEqual(["- alpha alpha\n- beta beta", "- gamma gamma\n- delta delta"]);
+  });
+
+  it("splits a dense path list of 1,000 to 2,000 characters instead of keeping it whole", async () => {
+    const items = Array.from(
+      { length: 24 },
+      (_, i) => `- \`apps/pkg-${i}/src/components/panels/example-panel/\``,
+    );
+    const body = `\n## Claimed folders\n\n${items.join("\n")}\n`;
+    expect(body.length).toBeGreaterThan(1000);
+    expect(body.length).toBeLessThan(2000);
+
+    const chunks = await chunkTexts(input("Doc", body));
+
+    expect(chunks.length).toBeGreaterThan(1);
+    expect(chunks.every((chunk) => chunk.text.trim().length <= 1000)).toBe(
+      true,
+    );
+  });
+
+  it("splits a paragraph of 1,000 to 2,000 characters at sentences under the default cap", async () => {
+    const sentence = `${"word ".repeat(13)}end.`;
+    const paragraph = Array.from({ length: 20 }, () => sentence).join(" ");
+    expect(paragraph.length).toBeGreaterThan(1000);
+    expect(paragraph.length).toBeLessThan(2000);
+
+    const chunks = await chunkTexts(input("Doc", `\n${paragraph}\n`));
+
+    expect(chunks.length).toBeGreaterThan(1);
+    expect(chunks.every((chunk) => chunk.text.trim().length <= 1000)).toBe(
+      true,
+    );
+    expect(chunks.every((chunk) => chunk.text.trim().endsWith(sentence))).toBe(
+      true,
+    );
+  });
+
+  it("lets a heading add its own length to a block that fills the cap", async () => {
+    const paragraph = "word ".repeat(19).trim();
+    const chunks = await chunkTexts(
+      input("Doc", `\n## Heading\n\n${paragraph}\n`),
+      paragraph.length,
+    );
+    expect(chunks).toHaveLength(1);
+    expect(chunks[0]?.text.trim()).toBe(`## Heading\n\n${paragraph}`);
+  });
+
+  it("rejects a cap that is not a positive integer", () => {
+    for (const maxChars of [0, -5, 1.5, Number.NaN]) {
+      expect(() => createStructuralChunker({ maxChars })).toThrow(RangeError);
+    }
   });
 
   it("never splits a code block, whatever its length", async () => {
@@ -296,10 +338,7 @@ describe("structural chunker tables, HTML headings and titles", () => {
       "| 2 | Check the logs. Then retry. |",
     ].join("\n");
     const doc = input("Doc", `\n${table}\n`);
-    const spans = await createStructuralChunker({
-      targetChars: 30,
-      maxChars: 40,
-    }).chunk(doc);
+    const spans = await createStructuralChunker({ maxChars: 30 }).chunk(doc);
     expect(spans).toHaveLength(1);
     expect(doc.body.slice(spans[0]?.start, spans[0]?.end).trim()).toBe(table);
   });

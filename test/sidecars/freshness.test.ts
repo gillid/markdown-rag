@@ -53,11 +53,8 @@ describe("checkFreshness", () => {
     const result = checkFreshness(
       knowledgeBase([doc("a.md", "h-a"), doc("b.md", "h-b")]),
       new Map([
-        [
-          "a.md",
-          fresh("h-a", { chunker: "structural@2;target=1000;max=2000" }),
-        ],
-        ["b.md", fresh("h-b", { chunker: "structural@2;target=500;max=1000" })],
+        ["a.md", fresh("h-a", { chunker: "structural@2;max=1000" })],
+        ["b.md", fresh("h-b", { chunker: "structural@2;max=500" })],
       ]),
     );
 
@@ -67,12 +64,12 @@ describe("checkFreshness", () => {
         {
           path: "a.md",
           reason:
-            "sidecars record different chunkers (structural@2;target=1000;max=2000, structural@2;target=500;max=1000) and this one has structural@2;target=1000;max=2000; run markdown-rag embed",
+            "sidecars record different chunkers (structural@2;max=1000, structural@2;max=500) and this one has structural@2;max=1000; run markdown-rag embed",
         },
         {
           path: "b.md",
           reason:
-            "sidecars record different chunkers (structural@2;target=1000;max=2000, structural@2;target=500;max=1000) and this one has structural@2;target=500;max=1000; run markdown-rag embed",
+            "sidecars record different chunkers (structural@2;max=1000, structural@2;max=500) and this one has structural@2;max=500; run markdown-rag embed",
         },
       ],
     });
