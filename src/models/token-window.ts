@@ -40,5 +40,6 @@ function describeOverflow(
     return `The query is ${tokens} tokens, over the ${window} (its instruction prefix included); shorten it.`;
   }
   const excerpt = JSON.stringify(text.slice(0, EXCERPT_CHARS));
-  return `A chunk of ${tokens} tokens (starting ${excerpt}) exceeds the ${window}. The chunker never splits code blocks or tables, so shorten or split that part of the document.`;
+  const density = (text.length / tokens).toFixed(1);
+  return `A chunk of ${tokens} tokens (starting ${excerpt}) exceeds the ${window}; it has ${density} characters per token, where prose has about 4. Shorten or split that part of the document.`;
 }

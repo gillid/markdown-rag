@@ -35,7 +35,7 @@ describe("assertFitsWindow", () => {
 
     expect(check).toThrow(EmbedderError);
     expect(check).toThrow(
-      'A chunk of 6 tokens (starting "a b c d e f") exceeds the 5-token window of test-model. The chunker never splits code blocks or tables, so shorten or split that part of the document.',
+      'A chunk of 6 tokens (starting "a b c d e f") exceeds the 5-token window of test-model; it has 1.8 characters per token, where prose has about 4. Shorten or split that part of the document.',
     );
   });
 

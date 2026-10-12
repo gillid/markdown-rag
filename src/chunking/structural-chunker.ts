@@ -3,15 +3,14 @@ import { buildBreadcrumb } from "./breadcrumb.ts";
 import type { Chunker, ChunkSpan } from "./chunker.ts";
 import { splitOversized } from "./split-oversized.ts";
 
-export const DEFAULT_TARGET_CHARS = 1000;
+// About 330 tokens for path-dense text, so a splittable chunk stays inside a 512-token window.
+export const DEFAULT_MAX_CHARS = 1000;
 // Bump when the splitting rules change.
-const ALGORITHM_VERSION = 1;
-const MAX_TO_TARGET_RATIO = 2;
+const ALGORITHM_VERSION = 2;
 const BREADCRUMB_SHARE = 0.25;
 
 export interface StructuralChunkerOptions {
-  targetChars?: number;
-  /** Paragraphs and lists longer than this are split; defaults to twice the target. */
+  /** Code blocks, tables and carried headings can exceed it (ADR-048). */
   maxChars?: number;
 }
 
@@ -21,16 +20,20 @@ const isHeading = (block: Block) => block.type === "heading";
 export function createStructuralChunker(
   options: StructuralChunkerOptions = {},
 ): Chunker {
-  const targetChars = options.targetChars ?? DEFAULT_TARGET_CHARS;
-  const maxChars = options.maxChars ?? targetChars * MAX_TO_TARGET_RATIO;
-  const maxBreadcrumb = Math.floor(targetChars * BREADCRUMB_SHARE);
+  const maxChars = options.maxChars ?? DEFAULT_MAX_CHARS;
+  if (!Number.isInteger(maxChars) || maxChars < 1) {
+    throw new RangeError(
+      `maxChars must be a positive integer, got ${maxChars}`,
+    );
+  }
+  const maxBreadcrumb = Math.floor(maxChars * BREADCRUMB_SHARE);
 
   return {
     // Everything that shapes the output is in the id, so a change invalidates recorded chunks.
-    id: `structural@${ALGORITHM_VERSION};target=${targetChars};max=${maxChars}`,
+    id: `structural@${ALGORITHM_VERSION};max=${maxChars}`,
     async chunk({ title, body, tree }) {
       const blocks = splitOversized(toBlocks(tree), body, maxChars);
-      const groups = packBlocks(blocks, targetChars);
+      const groups = packBlocks(blocks, maxChars);
 
       if (groups.length === 0) {
         // Blocks were all skipped (e.g. an empty heading), but the body still has text.
@@ -66,7 +69,7 @@ function pathOf(group: Block[]): HeadingRef[] {
   return (content ?? group.at(-1))?.headings ?? [];
 }
 
-function packBlocks(blocks: Block[], targetChars: number): Block[][] {
+function packBlocks(blocks: Block[], maxChars: number): Block[][] {
   const groups: Block[][] = [];
   let current: Block[] = [];
   let onlyHeadings = true;
@@ -78,14 +81,14 @@ function packBlocks(blocks: Block[], targetChars: number): Block[][] {
   };
 
   for (const block of blocks) {
-    const oversized = block.end - block.start > targetChars;
+    const oversized = block.end - block.start > maxChars;
     const first = current[0];
 
     if (
       !onlyHeadings &&
       (isHeading(block) ||
         oversized ||
-        (first && block.end - first.start > targetChars))
+        (first && block.end - first.start > maxChars))
     ) {
       flush();
     }
