@@ -74,7 +74,7 @@ A sidecar is a JSON file, two-space indented, with a trailing newline:
 {
   "format": 1,
   "doc_hash": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
-  "chunker": "structural@1;target=1000;max=2000",
+  "chunker": "structural@2;max=1000",
   "model": "bge-small-en-v1.5-q8",
   "dims": 384,
   "chunks": [
